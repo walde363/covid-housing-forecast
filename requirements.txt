@@ -4,3 +4,4 @@ matplotlib
 statsmodels
 statsforecast
 scikit-learn
+openpyxl

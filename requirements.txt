@@ -1,7 +1,11 @@
 pandas
 numpy
 matplotlib
+seaborn
+plotly
 statsmodels
 statsforecast
 scikit-learn
+xgboost
+prophet
 openpyxl

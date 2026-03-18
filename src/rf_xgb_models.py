@@ -6,16 +6,7 @@ import numpy as np
 from xgboost import XGBRegressor
 import matplotlib.pyplot as plt
 from helpers.plotting import plot_model_results
-
-
-def evaluate_model(y_true, y_pred, model_name):
-    results = {
-        "Model": model_name,
-        "R2": r2_score(y_true, y_pred),
-        "RMSE": np.sqrt(mean_squared_error(y_true, y_pred))
-    }
-    return results
-
+from helpers.model_evaluator import evaluate_model
 
 def rfr_model(rf_X_train, rf_y_train, rf_X_test):
     rf_model = RandomForestRegressor(

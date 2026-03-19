@@ -9,3 +9,5 @@ scikit-learn
 xgboost
 prophet
 openpyxl
+tabulate
+great_tables

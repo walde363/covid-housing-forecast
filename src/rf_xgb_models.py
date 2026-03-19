@@ -56,11 +56,9 @@ def train_test_split(df_model, target_col, feature_cols):
 
     return train_df, test_df, X_train, y_train, X_test, y_test
 
-def rf_xgb_models(target_col, dataset, cols_to_drop):
-    data = dataset.copy()
-
-    # Drop unwanted columns
-    df_model = data.drop(columns=cols_to_drop, errors="ignore").copy()
+def rf_xgb_models(target_col, dataset, selected_cols):
+    # Select columns
+    df_model = dataset[selected_cols].copy()
 
     # Date handling
     df_model["date"] = pd.to_datetime(df_model["date"])

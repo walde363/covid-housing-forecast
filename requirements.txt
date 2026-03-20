@@ -11,3 +11,4 @@ prophet
 openpyxl
 tabulate
 great_tables
+streamlit

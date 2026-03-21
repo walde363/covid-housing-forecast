@@ -4,7 +4,7 @@ from helpers.model_evaluator import evaluate_model
 
 def seasonal_naive_model(data, target, filter_col, filter_by, periods):
     
-    region = data[data[filter_col] == filter_by]
+    region = data[data[filter_col] == filter_by].copy()
     region["date"] = pd.to_datetime(region["date"])
     region = region.sort_values("date")
     region = region[["date", target]].dropna()
@@ -33,7 +33,7 @@ def seasonal_naive_model(data, target, filter_col, filter_by, periods):
         y_true=test,
         y_pred=forecast,
         model_name="Seasonal Naive",
-        metrics=["rmse", "mae", "mase", "mape"],
+        metrics=["rmse", "mae", "mape"],
         train=train
     )
     

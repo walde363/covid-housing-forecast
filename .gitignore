@@ -4,3 +4,5 @@ __pycache__/
 .env
 .venv/
 ipynb_checkpoints/
+data/raw/
+data/processed/

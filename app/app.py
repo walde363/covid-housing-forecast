@@ -7,11 +7,12 @@ sys.path.append(str(PROJECT_ROOT))
 import streamlit as st
 from components.slide_viewer import render_slide_viewer
 from src.sarimax_model import sarimax_model
+from components.dashboard_map import dashboard_map
 import pandas as pd
+import geopandas as gpd
+from streamlit_folium import st_folium
 
-data = pd.read_csv("data/processed/processed_data_low.csv")
-regions = data["RegionName"].unique()
-print(regions)
+realtor_hotness = pd.read_csv("https://econdata.s3-us-west-2.amazonaws.com/Reports/Hotness/RDC_Inventory_Hotness_Metrics_County_History.csv")
 
 st.set_page_config(
     page_title="COVID-era changes in Florida home prices compared to National trends",
@@ -26,35 +27,37 @@ st.markdown(
     """
 )
 
-tab1, tab2, tab3 = st.tabs(["Random Forest", "XGBoost", "SARIMAX"])
+dashboard_map(realtor_hotness)
 
-with tab1:
-    st.header("Random Forest Model")
-    st.write("Comming Soon")
-with tab2:
-    st.header("XGBoost Model")
-    st.write("Commign Soon")
-with tab3:
-    st.header("SARIMAX Model")
-    selected_region = st.selectbox("Select Region", regions)
+# tab1, tab2, tab3 = st.tabs(["Random Forest", "XGBoost", "SARIMAX"])
 
-    result = sarimax_model(data, selected_region, "MarketTemp")
+# with tab1:
+#     st.header("Random Forest Model")
+#     st.write("Comming Soon")
+# with tab2:
+#     st.header("XGBoost Model")
+#     st.write("Commign Soon")
+# with tab3:
+#     st.header("SARIMAX Model")
+#     selected_region = st.selectbox("Select Region", regions)
 
-    col1, col2 = st.columns([3, 1])
+#     result = sarimax_model(data, selected_region, "MarketTemp")
 
-    with col1:
-        plot_df = pd.DataFrame({
-            "predicted": pd.Series(result["forecast"]),
-            "train": pd.Series(result["train"]),
-            "test": pd.Series(result["test"]),
-        })
+#     col1, col2 = st.columns([3, 1])
 
-        st.line_chart(plot_df)
+#     with col1:
+#         plot_df = pd.DataFrame({
+#             "predicted": pd.Series(result["forecast"]),
+#             "train": pd.Series(result["train"]),
+#             "test": pd.Series(result["test"]),
+#         })
 
-    with col2:
-        st.subheader("Model Metrics")
-        for key, value in list(result["eval_results"].items())[1:]:
-            st.write(f"{key}: {value:4f}")
+#         st.line_chart(plot_df)
+
+#     with col2:
+#         st.subheader("Model Metrics")
+#         for key, value in list(result["eval_results"].items())[1:]:
+#             st.write(f"{key}: {value:4f}")
 
 with st.expander("About"):
     render_slide_viewer(

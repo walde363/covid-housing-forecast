@@ -12,3 +12,10 @@ openpyxl
 tabulate
 great_tables
 streamlit
+geopandas
+folium>=0.12
+streamlit-folium
+mapclassify
+shapely
+pyogrio
+fiona

@@ -11,3 +11,6 @@ prophet
 openpyxl
 tabulate
 great_tables
+requests
+kagglehub
+thefuzz

@@ -1,6 +1,10 @@
 import pandas as pd
 import os
 
+## Run this script from the root of the project directory
+## python helpers/summarize_data.py "data/processed/{FILENAME}"
+
+
 def summarize_data(file_path):
     """Loads a CSV file and prints basic statistics for its features."""
     if not os.path.exists(file_path):
@@ -63,13 +67,17 @@ def summarize_data(file_path):
 
 if __name__ == "__main__":
     import contextlib
+    import sys
 
     # Ensure reports directory exists
     os.makedirs("reports", exist_ok=True)
     report_path = os.path.join("reports", "data_summary.txt")
 
-    # Using a relative file reference pointing to the processed data directory
-    relative_path = os.path.join("./", "data", "processed", "RDC_Inventory_Core_Metrics_Zip_History.csv")
+    # Use command line argument if provided, otherwise default to the previous hardcoded value
+    if len(sys.argv) > 1:
+        relative_path = sys.argv[1]
+    else:
+        relative_path = os.path.join("./", "data", "processed", "RDC_Inventory_Core_Metrics_Zip_History.csv")
     
     print(f"Writing summary to {report_path}...")
     with open(report_path, "w", encoding="utf-8") as f:

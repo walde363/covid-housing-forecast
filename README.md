@@ -137,6 +137,12 @@ cd covid-housing-forecast
 conda create -n housing_env python=3.12
 conda activate housing_env
 ```
+or
+```bash
+python -m venv venv
+# source venv/bin/activate  # Linux/macOS
+venv\Scripts\activate  # Windows
+```
 
 ### Install dependencies
 

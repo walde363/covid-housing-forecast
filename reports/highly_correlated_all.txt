@@ -1,0 +1,42 @@
+These pairs are highly correlated (either positively or negatively) and could cause multicollinearity:
+U.S. 5/1 ARM                             highest_category                        1.000000
+highest_category                         30 year fees & points                   1.000000
+15 year fees & points                    highest_category                        1.000000
+30 year FRM / 5/1 ARM spread             highest_category                        1.000000
+median_listing_price_x                   median_listing_price_y                  1.000000
+median_days_on_market_yy_y               median_days_on_market_yy_x              1.000000
+median_days_on_market_mm_x               median_days_on_market_mm_y              1.000000
+median_listing_price_yy_y                median_listing_price_yy_x               1.000000
+median_listing_price_mm_x                median_listing_price_mm_y               1.000000
+median_days_on_market_y                  median_days_on_market_x                 0.999946
+U.S. 15 year FRM                         U.S. 30 year FRM                        0.997655
+hotness_score                            hotness_rank_mm                        -0.995642
+active_listing_count                     total_listing_count                     0.976645
+U.S. 5/1 ARM                             U.S. 15 year FRM                        0.960400
+median_listing_price_per_square_foot_mm  median_listing_price_mm_x               0.950886
+median_listing_price_vs_us               median_listing_price_y                  0.946717
+median_listing_price_x                   median_listing_price_vs_us              0.946717
+average_listing_price_yy                 average_listing_price_mm                0.937516
+U.S. 5/1 ARM                             U.S. 30 year FRM                        0.931258
+new_listing_count                        total_listing_count                     0.927866
+active_listing_count                     price_reduced_count                     0.923348
+30 year fees & points                    15 year fees & points                   0.921283
+total_listing_count                      price_reduced_count                     0.920146
+average_listing_price                    median_listing_price_y                  0.917898
+total_listing_count                      pending_listing_count                   0.912516
+median_days_on_market_mm_x               median_dom_mm_day                       0.907910
+median_days_on_market_mm_y               median_dom_mm_day                       0.907910
+supply_score                             median_dom_vs_us                       -0.901448
+median_listing_price_y                   median_listing_price_per_square_foot    0.900023
+new_listing_count                        pending_listing_count                   0.898630
+demand_score                             page_view_count_per_property_vs_us      0.891858
+active_listing_count_yy                  total_listing_count_yy                  0.887211
+median_listing_price_vs_us               average_listing_price                   0.881570
+active_listing_count                     new_listing_count                       0.879254
+new_listing_count                        price_reduced_count                     0.868967
+median_days_on_market_yy_x               median_dom_yy_day                       0.866468
+median_dom_yy_day                        median_days_on_market_yy_y              0.866468
+median_days_on_market_y                  median_dom_vs_us                        0.859404
+median_dom_vs_us                         median_days_on_market_x                 0.859341
+hotness_score                            demand_score                            0.847880
+dtype: float64

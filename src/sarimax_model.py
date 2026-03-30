@@ -4,7 +4,8 @@ import pandas as pd
 
 def sarimax_model(
     data,
-    regionName,
+    filter_col, 
+    filter_by,
     target,
     periods=16,
     order=(1, 1, 1),
@@ -43,7 +44,7 @@ def sarimax_model(
         Model object, forecast, train/test splits, optional exogenous splits,
         and evaluation results.
     """
-    region = data[data["RegionName"] == regionName].copy()
+    region = data[data[filter_col] == filter_by].copy()
 
     region["date"] = pd.to_datetime(region["date"])
     region = region.sort_values("date")
@@ -54,7 +55,7 @@ def sarimax_model(
 
     if len(region) <= periods:
         raise ValueError(
-            f"Not enough observations for region '{regionName}'. Need more than {periods} rows."
+            f"Not enough observations for region '{filter_by}'. Need more than {periods} rows."
         )
 
     selected_target = region[target]

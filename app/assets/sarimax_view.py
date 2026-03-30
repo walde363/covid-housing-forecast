@@ -1,20 +1,13 @@
 import streamlit as st
 import plotly.graph_objects as go
-from src.seasonal_naive_model import seasonal_naive_model
+from src.sarimax_model import sarimax_model
 
-
-def render_seasonal_naive(filtered_data, selected_region):
+def sarimax_view(filtered_data, selected_region):
     with st.container():
-        st.header("Seasonal Naive Model")
-
-        result = seasonal_naive_model(
-            filtered_data,
-            "median_listing_price_x",
-            "county_name_x",
-            selected_region,
-            12
-        )
-
+        st.header("SARIMAX Model")
+        
+        result = sarimax_model(filtered_data, "county_name_x", selected_region,"median_listing_price_x", 12)
+        
         train = result["train"]
         test = result["test"]
         forecast = result["forecast"]
@@ -66,4 +59,3 @@ def render_seasonal_naive(filtered_data, selected_region):
                     st.write(f"{key}: {value:.4f}")
                 else:
                     st.write(f"{key}: {value}")
-                    

@@ -10,10 +10,11 @@ import pandas as pd
 from assets.map import state_map
 from assets.seasonal_naive_view import render_seasonal_naive
 from assets.sarimax_view import sarimax_view
+from assets.rf_view import rf_view
 
 data = pd.read_csv("data/processed/processed_data_pre_model.csv")
-data["date"] = pd.to_datetime(data["month_date_yyyymm"])
 data["state"] = data["county_name_x"].str.split(", ").str[-1].str.lower()
+data = data.drop(columns=[col for col in data.columns if "_mm" in col or "_yy" in col])
 
 st.set_page_config(
     page_title="House Market Predictive Interactive Dashboard",
@@ -53,7 +54,7 @@ with tab2:
     sarimax_view(filtered_data, selected_region)
 
 with tab3:
-    st.write("In progress")
+    rf_view(data, selected_region, selected_state)
 
 with tab4:
     st.write("In progress")

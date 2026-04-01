@@ -1,40 +1,92 @@
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 
-def prepare_tree_model_data(dataset, target_col, selected_cols):
-    df_model = dataset[selected_cols].copy()
+from helpers.build_aggregation_rules import build_aggregation_rules
 
-    df_model["date"] = pd.to_datetime(df_model["date"])
-    df_model = df_model.sort_values(["RegionName", "date"]).copy()
 
-    df_model["year"] = df_model["date"].dt.year
-    df_model["month"] = df_model["date"].dt.month
-    df_model["quarter"] = df_model["date"].dt.quarter
+def prepare_tree_model_data(
+    dataset,
+    target_col,
+    selected_cols,
+    level="region",
+    region=None,
+    state=None
+):
+    """
+    Prepare data for tree-based models at different geographic levels.
 
-    if "RegionType" in df_model.columns:
-        df_model = pd.get_dummies(df_model, columns=["RegionType"], drop_first=True)
+    Parameters
+    ----------
+    dataset : pd.DataFrame
+        Full dataset.
+    target_col : str
+        Target variable.
+    selected_cols : list
+        Columns to keep.
+    level : str
+        One of: "region", "state", "us"
+    region : str, optional
+        Region name for region-level modeling.
+    state : str, optional
+        State abbreviation for state-level modeling.
 
-    le_region = LabelEncoder()
-    df_model["RegionName_enc"] = le_region.fit_transform(df_model["RegionName"])
+    Returns
+    -------
+    pd.DataFrame
+        Cleaned dataframe with one row per date for the chosen level.
+    """
 
-    for lag in [1, 2, 3, 6, 12]:
-        df_model[f"lag_{lag}"] = df_model.groupby("RegionName")[target_col].shift(lag)
+    required_cols = ["date", target_col]
+    cols_to_use = list(dict.fromkeys(required_cols + selected_cols))
 
-    grouped_target = df_model.groupby("RegionName")[target_col]
+    missing_cols = [col for col in cols_to_use if col not in dataset.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
 
-    df_model["roll_mean_3"] = (
-        grouped_target.shift(1).rolling(3).mean().reset_index(level=0, drop=True)
-    )
-    df_model["roll_mean_6"] = (
-        grouped_target.shift(1).rolling(6).mean().reset_index(level=0, drop=True)
-    )
-    df_model["roll_std_3"] = (
-        grouped_target.shift(1).rolling(3).std().reset_index(level=0, drop=True)
-    )
+    df = dataset[cols_to_use].copy()
 
-    cols_to_not_include = [target_col, "date", "RegionName"]
-    feature_cols = [col for col in df_model.columns if col not in cols_to_not_include]
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date")
 
-    df_model = df_model.dropna(subset=feature_cols + [target_col]).reset_index(drop=True)
+    # -------------------------
+    # Level-specific filtering
+    # -------------------------
+    if level == "region":
+        if region is None:
+            raise ValueError("region must be provided when level='region'")
 
-    return df_model, feature_cols
+        if "county_name_x" not in dataset.columns and "region" not in dataset.columns:
+            raise ValueError("No region column found. Expected 'county_name_x' or 'region'.")
+
+        region_col = "county_name_x" if "county_name_x" in dataset.columns else "region"
+        df[region_col] = dataset[region_col]
+
+        df = df[df[region_col].str.lower() == region.lower()].copy()
+        df = df.drop(columns=[region_col], errors="ignore")
+
+    elif level == "state":
+        if state is None:
+            raise ValueError("state must be provided when level='state'")
+
+        if "state" not in dataset.columns:
+            raise ValueError("Column 'state' is required for state-level modeling.")
+
+        df["state"] = dataset["state"].astype(str).str.lower()
+        df = df[df["state"] == state.lower()].copy()
+        df = df.drop(columns=["state"], errors="ignore")
+
+        agg_rules = build_aggregation_rules(df.columns, target_col)
+        df = df.groupby("date", as_index=False).agg(agg_rules)
+
+    elif level == "us":
+        agg_rules = build_aggregation_rules(df.columns, target_col)
+        df = df.groupby("date", as_index=False).agg(agg_rules)
+
+    else:
+        raise ValueError("level must be one of: 'region', 'state', 'us'")
+
+    # -------------------------
+    # Final cleanup
+    # -------------------------
+    df = df.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+
+    return df

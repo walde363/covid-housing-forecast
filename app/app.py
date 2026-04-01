@@ -54,7 +54,7 @@ with tab2:
     sarimax_view(filtered_data, selected_region)
 
 with tab3:
-    rf_view(data, filtered_data, selected_region, selected_state)
+    rf_view(data, selected_region, selected_state)
 
 with tab4:
     st.write("In progress")

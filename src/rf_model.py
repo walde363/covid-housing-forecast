@@ -1,10 +1,9 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 
-from helpers.feature_engineering import prepare_tree_model_data
-from helpers.data_split import time_based_train_test_split
+from helpers.prepare_tree_model_data import prepare_tree_model_data
+from helpers.time_based_train_test_split import time_based_train_test_split
 from helpers.model_evaluator import evaluate_model
-from helpers.plotting import plot_model_results
 
 
 def train_random_forest(X_train, y_train, X_test):
@@ -21,33 +20,42 @@ def train_random_forest(X_train, y_train, X_test):
     return model, predictions
 
 
-def rf_model_pipeline(target_col, dataset, selected_cols):
-    df_model, feature_cols = prepare_tree_model_data(
+def rf_model_pipeline(target_col, dataset, selected_cols, region):
+    
+    df_model = prepare_tree_model_data(
         dataset=dataset,
         target_col=target_col,
-        selected_cols=selected_cols
+        selected_cols=selected_cols,
+        region=region
     )
 
     train_df, test_df, X_train, y_train, X_test, y_test = time_based_train_test_split(
-        df_model, target_col, feature_cols
+        df_model, target_col, selected_cols
     )
 
-    model, predictions = train_random_forest(X_train, y_train, X_test)
+    model, pred = train_random_forest(X_train, y_train, X_test)
 
-    metrics_table = pd.DataFrame([
-        evaluate_model(y_test, predictions, "Random Forest")
-    ]).round(4)
-
-    plot_model_results(
-        test_df=test_df,
-        actual_values=y_test.values,
-        model_results=[predictions],
-        labels=["Train", "Actual", "RF Forecast"],
-        title="Random Forest Forecast Comparison",
-        target_col=target_col,
-        train_df=train_df,
-        y_train=y_train.values,
-        aggregate=True
+    evaluation_result = evaluate_model(
+        y_true=y_test,
+        y_pred=pred,
+        model_name="Random Forest",
+        metrics=["rmse", "mae", "mase", "mape"],
+        train=y_train
     )
 
-    return metrics_table, model
+    train = train_df.sort_values("date").set_index("date")[target_col]
+    test = test_df.sort_values("date").set_index("date")[target_col]
+
+    forecast = pd.Series(
+        pred,
+        index=test.index,
+        name="forecast"
+    )
+
+    return {
+        "model": model,
+        "forecast": forecast,
+        "train": train,
+        "test": test,
+        "eval_results": evaluation_result
+    }

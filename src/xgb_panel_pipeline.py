@@ -1,9 +1,10 @@
 import pandas as pd
 
-from helpers.prepare_tree_model_data import prepare_tree_model_data
-from helpers.time_based_train_test_split import time_based_train_test_split
+from helpers.prepare_panel_model_data import prepare_panel_model_data
+from helpers.time_based_panel_split import time_based_panel_split
 from helpers.model_evaluator import evaluate_model
 from xgboost import XGBRegressor
+
 
 def train_xgboost(X_train, y_train, X_test):
     model = XGBRegressor(
@@ -22,33 +23,34 @@ def train_xgboost(X_train, y_train, X_test):
     return model, predictions
 
 
-def xgb_model_pipeline(
+def xgb_panel_pipeline(
     target_col,
     dataset,
     selected_cols,
-    level="region",
-    region=None,
-    state=None,
+    selected_region,
+    region_col="county_name_x",
+    state_col="state",
     test_periods=12
 ):
     """
-    Random Forest pipeline supporting region/state/us modeling.
+    Train XGBoost on all US rows, predict only selected region.
     """
 
-    df_model = prepare_tree_model_data(
+    df_model = prepare_panel_model_data(
         dataset=dataset,
         target_col=target_col,
         selected_cols=selected_cols,
-        level=level,
-        region=region,
-        state=state
+        region_col=region_col,
+        state_col=state_col
     )
 
-    train_df, test_df, X_train, y_train, X_test, y_test = time_based_train_test_split(
+    train_df, test_df, X_train, y_train, X_test, y_test = time_based_panel_split(
         df_model=df_model,
         target_col=target_col,
-        test_periods=test_periods,
-        add_features=True
+        selected_region=selected_region,
+        region_col=region_col,
+        state_col=state_col,
+        test_periods=test_periods
     )
 
     model, pred = train_xgboost(X_train, y_train, X_test)
@@ -56,19 +58,20 @@ def xgb_model_pipeline(
     evaluation_result = evaluate_model(
         y_true=y_test,
         y_pred=pred,
-        model_name=f"XGBoost ({level})",
+        model_name="XGBoost (US train, region predict)",
         metrics=["rmse", "mae", "mase", "mape"],
         train=y_train
     )
 
-    train = train_df.sort_values("date").set_index("date")[target_col]
     test = test_df.sort_values("date").set_index("date")[target_col]
+    forecast = pd.Series(pred, index=test.index, name="forecast")
 
-    forecast = pd.Series(
-        pred,
-        index=test.index,
-        name="forecast"
-    )
+    region_history = df_model[df_model[region_col] == selected_region.lower().strip()].copy()
+    region_history = region_history.sort_values("date")
+
+    train_cutoff = test.index.min()
+    train_region = region_history[region_history["date"] < train_cutoff].copy()
+    train = train_region.set_index("date")[target_col]
 
     return {
         "model": model,
@@ -80,5 +83,7 @@ def xgb_model_pipeline(
         "X_test": X_test,
         "y_train": y_train,
         "y_test": y_test,
-        "df_model": df_model
+        "train_df": train_df,
+        "test_df": test_df
     }
+    

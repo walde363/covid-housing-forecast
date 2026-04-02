@@ -14,3 +14,4 @@ great_tables
 requests
 kagglehub
 thefuzz
+streamlit

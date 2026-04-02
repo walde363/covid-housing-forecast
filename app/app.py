@@ -11,6 +11,7 @@ from assets.map import state_map
 from assets.seasonal_naive_view import render_seasonal_naive
 from assets.sarimax_view import sarimax_view
 from assets.rf_view import rf_view
+from assets.xgb_view import xgb_view
 
 data = pd.read_csv("data/processed/processed_data_pre_model.csv")
 data["state"] = data["county_name_x"].str.split(", ").str[-1].str.lower()
@@ -57,7 +58,7 @@ with tab3:
     rf_view(data, selected_region, selected_state)
 
 with tab4:
-    st.write("In progress")
+    xgb_view(data, selected_region, selected_state)
 
 with tab5:
     st.write("In progress")

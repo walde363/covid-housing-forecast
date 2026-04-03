@@ -259,7 +259,6 @@ selected_region = st.selectbox(
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT"]
 )
-start = time.time()
 with tab1:
     render_seasonal_naive(filtered_data, selected_region)
 
@@ -274,5 +273,3 @@ with tab4:
 
 with tab5:
     st.write("In progress")
-    
-st.write(time.time() - start)

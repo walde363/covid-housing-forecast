@@ -5,15 +5,9 @@ from helpers.time_based_train_test_split import time_based_train_test_split
 from helpers.model_evaluator import evaluate_model
 from xgboost import XGBRegressor
 
-def train_xgboost(X_train, y_train, X_test):
+def train_xgboost(X_train, y_train, X_test, params):
     model = XGBRegressor(
-        n_estimators=300,
-        learning_rate=0.05,
-        max_depth=6,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        objective="reg:squarederror"
+        **params
     )
 
     model.fit(X_train, y_train)
@@ -26,6 +20,7 @@ def xgb_model_pipeline(
     target_col,
     dataset,
     selected_cols,
+    params,
     level="region",
     region=None,
     state=None,
@@ -41,7 +36,7 @@ def xgb_model_pipeline(
         selected_cols=selected_cols,
         level=level,
         region=region,
-        state=state
+        state=state,
     )
 
     train_df, test_df, X_train, y_train, X_test, y_test = time_based_train_test_split(
@@ -51,7 +46,7 @@ def xgb_model_pipeline(
         add_features=True
     )
 
-    model, pred = train_xgboost(X_train, y_train, X_test)
+    model, pred = train_xgboost(X_train, y_train, X_test, params)
 
     evaluation_result = evaluate_model(
         y_true=y_test,

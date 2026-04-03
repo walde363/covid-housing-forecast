@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[0]
+sys.path.append(str(PROJECT_ROOT))
+
+from metrics_display import metrics_display
+
 import streamlit as st
 import plotly.graph_objects as go
 from src.seasonal_naive_model import seasonal_naive_model
@@ -94,7 +102,5 @@ def render_seasonal_naive(filtered_data, selected_region):
             st.plotly_chart(fig, width='stretch')
 
         with col2:
-            st.header("Model Metrics")
-            for item in result["eval_results"]:
-                st.write(f"## {item["Metric"]}: :{item["Color"]}[{item["Value"]}]")
+            metrics_display(result["eval_results"])
                     

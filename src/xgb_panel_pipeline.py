@@ -6,15 +6,9 @@ from helpers.model_evaluator import evaluate_model
 from xgboost import XGBRegressor
 
 
-def train_xgboost(X_train, y_train, X_test):
+def train_xgboost(X_train, y_train, X_test, params):
     model = XGBRegressor(
-        n_estimators=300,
-        learning_rate=0.05,
-        max_depth=6,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        objective="reg:squarederror"
+        **params
     )
 
     model.fit(X_train, y_train)
@@ -28,6 +22,7 @@ def xgb_panel_pipeline(
     dataset,
     selected_cols,
     selected_region,
+    params,
     region_col="county_name_x",
     state_col="state",
     test_periods=12
@@ -53,7 +48,7 @@ def xgb_panel_pipeline(
         test_periods=test_periods
     )
 
-    model, pred = train_xgboost(X_train, y_train, X_test)
+    model, pred = train_xgboost(X_train, y_train, X_test, params)
 
     evaluation_result = evaluate_model(
         y_true=y_test,

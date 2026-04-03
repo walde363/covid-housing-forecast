@@ -42,39 +42,39 @@ def get_metric_rating(metric_name, value):
     # Higher is better
     if metric_name == "R2":
         if value >= 0.90:
-            return "Very Good", "green"
+            return "Very Good", "#34C6F4"
         elif value >= 0.75:
-            return "Good", "yellow"
+            return "Good", "#A7DFF3"
         else:
-            return "Bad", "red"
+            return "Bad", "#FF5C00"
 
     # Lower is better
     elif metric_name == "MAPE":
         # sklearn returns MAPE as decimal, e.g. 0.08 = 8%
         if value < 0.05:
-            return "Very Good", "green"
+            return "Very Good", "#34C6F4"
         elif value < 0.10:
-            return "Good", "yellow"
+            return "Good", "#A7DFF3"
         else:
-            return "Bad", "red"
+            return "Bad", "#FF5C00"
 
     elif metric_name == "MASE":
         if value < 0.60:
-            return "Very Good", "green"
+            return "Very Good", "#34C6F4"
         elif value < 1.00:
-            return "Good", "yellow"
+            return "Good", "#A7DFF3"
         else:
-            return "Bad", "red"
+            return "Bad", "#FF5C00"
 
     elif metric_name in ["RMSE", "MSE", "MAE"]:
         # These depend heavily on scale, so you may want to customize later
         # For now, use a generic fallback
         if value < 10000:
-            return "Very Good", "green"
+            return "Very Good", "#34C6F4"
         elif value < 30000:
-            return "Good", "yellow"
+            return "Good", "#A7DFF3"
         else:
-            return "Bad", "red"
+            return "Bad", "#FF5C00"
 
     return "N/A", "gray"
 

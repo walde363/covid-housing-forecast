@@ -12,6 +12,7 @@ from assets.seasonal_naive_view import render_seasonal_naive
 from assets.sarimax_view import sarimax_view
 from assets.rf_view import rf_view
 from assets.xgb_view import xgb_view
+import time
 
 st.set_page_config(
     page_title="House Market Predictive Interactive Dashboard",
@@ -258,7 +259,7 @@ selected_region = st.selectbox(
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT"]
 )
-
+start = time.time()
 with tab1:
     render_seasonal_naive(filtered_data, selected_region)
 
@@ -268,8 +269,10 @@ with tab2:
 with tab3:
     rf_view(data, selected_region, selected_state)
 
-# with tab4:
-#     xgb_view(data, selected_region, selected_state)
+with tab4:
+    xgb_view(data, selected_region, selected_state)
 
 with tab5:
     st.write("In progress")
+    
+st.write(time.time() - start)

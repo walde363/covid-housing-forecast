@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[0]
+sys.path.append(str(PROJECT_ROOT))
+
+from metrics_display import metrics_display
+
 import streamlit as st
 import plotly.graph_objects as go
 from src.sarimax_model import sarimax_model
@@ -146,6 +154,4 @@ def sarimax_view(filtered_data, selected_region):
                 key="selected_Q"
             )
             st.divider()
-            st.header("Model Metrics")
-            for item in result["eval_results"]:
-                st.write(f"## {item["Metric"]}: :{item["Color"]}[{item["Value"]}]")
+            metrics_display(result["eval_results"])

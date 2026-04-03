@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[0]
+sys.path.append(str(PROJECT_ROOT))
+
+from metrics_display import metrics_display
+
 import streamlit as st
 import plotly.graph_objects as go
 from src.rf_model import rf_model_pipeline
@@ -77,7 +85,7 @@ MODEL_APROACHES_MD_4 = """
 - Requires careful feature engineering
 """
 
-model_vars = ["rg", "state", "aggr", "ust"]
+model_vars = ["rg_rf", "state_rf", "aggr_rf", "ust_rf"]
 
 rf_tuning_features = [
     "n_estimators",
@@ -178,9 +186,7 @@ def models_cols(results, plot_label, model):
                     key=f"selected_{model}_{param}"
                 )
         st.divider()
-        st.header("Model Metrics")
-        for item in results["eval_results"]:
-                st.write(f"## {item["Metric"]}: :{item["Color"]}[{item["Value"]}]")
+        metrics_display(results["eval_results"])
     
     with col1:
         build_plot(results, plot_label)
@@ -246,9 +252,9 @@ def rf_view(data, selected_region, selected_state):
             level="region",
             region=selected_region,
             test_periods=12,
-            params=get_rf_params("rg")
+            params=get_rf_params("rg_rf")
         )
-        models_cols(result_region, selected_region, "rg")
+        models_cols(result_region, selected_region, "rg_rf")
 
     with tab2:
         result_state = rf_model_pipeline(
@@ -258,9 +264,9 @@ def rf_view(data, selected_region, selected_state):
             level="state",
             state=selected_state,
             test_periods=12,
-            params = get_rf_params("state")
+            params = get_rf_params("state_rf")
         )
-        models_cols(result_state, selected_state.upper(), "state")
+        models_cols(result_state, selected_state.upper(), "state_rf")
 
     with tab3:
         result_us = rf_model_pipeline(
@@ -269,9 +275,9 @@ def rf_view(data, selected_region, selected_state):
             selected_cols=selected_features,
             level="us",
             test_periods=12,
-            params = get_rf_params("aggr")
+            params = get_rf_params("aggr_rf")
         )
-        models_cols(result_us, "Entire US", "aggr")
+        models_cols(result_us, "Entire US", "aggr_rf")
 
     with tab4:
         st.warning('WARNING: Expected time to run is 3 minutes', icon="⚠️")
@@ -283,8 +289,8 @@ def rf_view(data, selected_region, selected_state):
                     selected_cols=panel_features,
                     selected_region=selected_region,
                     test_periods=12,
-                    params=get_rf_params("ust")
+                    params=get_rf_params("ust_rf")
                 )
-            models_cols(rf_result, f"US Train → {selected_region}", "ust")
+            models_cols(rf_result, f"US Train → {selected_region}", "ust_rf")
         
         

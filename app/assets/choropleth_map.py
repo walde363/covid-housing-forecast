@@ -8,6 +8,7 @@ import os
 
 GEOJSON_PATH = os.path.join(os.path.dirname(__file__), 'geojson-counties-fips.json')
 
+# Cache the geojson data to avoid re-downloading it every time
 @st.cache_data
 def get_geojson():
     if not os.path.exists(GEOJSON_PATH):
@@ -20,6 +21,7 @@ def get_geojson():
         with open(GEOJSON_PATH, 'r') as f:
             return json.load(f)
 
+# Render the heat map
 def render_choropleth(data, selected_state):
     st.subheader(f"Median Home Prices in {selected_state.upper()} by County")
     
@@ -59,8 +61,7 @@ def render_choropleth(data, selected_state):
 
     counties = get_geojson()
     
-    # Get max price for scale consistency, or let it change per frame.
-    # Usually it's better to dynamically change or set a fixed max based on data.
+    # Get max price for scale consistency
     max_price = state_data['median_listing_price_x'].max()
     
     fig = px.choropleth(

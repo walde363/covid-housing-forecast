@@ -77,6 +77,43 @@ MODEL_APROACHES_MD_4 = """
 - Requires careful feature engineering
 """
 
+model_vars = ["rg", "state", "aggr", "ust"]
+
+rf_tuning_features = [
+    "n_estimators",
+    "max_depth",
+    "min_samples_split",
+    "min_samples_leaf",
+    "max_features",
+    "bootstrap"
+]
+
+defaults = {
+    "n_estimators": [300, 100, 500],
+    "max_depth": [10, 15, 20, None],
+    "min_samples_split": [5, 2, 10],
+    "min_samples_leaf": [2, 1, 4],
+    "max_features": ["sqrt", "log2"],
+    "bootstrap": [True, False]
+}
+
+for i in model_vars:
+    for a in rf_tuning_features:
+        key = f"selected_{i}_{a}"
+        if key not in st.session_state:
+            st.session_state[key] = defaults[a][0]
+
+def get_rf_params(prefix):
+    return {
+        "n_estimators": st.session_state[f"selected_{prefix}_n_estimators"],
+        "max_depth": st.session_state[f"selected_{prefix}_max_depth"],
+        "min_samples_split": st.session_state[f"selected_{prefix}_min_samples_split"],
+        "min_samples_leaf": st.session_state[f"selected_{prefix}_min_samples_leaf"],
+        "max_features": st.session_state[f"selected_{prefix}_max_features"],
+        "bootstrap": st.session_state[f"selected_{prefix}_bootstrap"],
+        "random_state": 42,
+        "n_jobs": 1
+    }
 
 def build_plot(result, plot_label):
     train = result["train"]
@@ -114,6 +151,7 @@ def build_plot(result, plot_label):
         template="plotly_dark",
         paper_bgcolor="#1E293B",
         plot_bgcolor="#1E293B",
+        height=700,
         font=dict(color="#F8FAFC"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
@@ -121,19 +159,31 @@ def build_plot(result, plot_label):
     st.plotly_chart(fig, width='stretch')
 
 
-def models_cols(results, plot_label):
+def models_cols(results, plot_label, model):
     col1, col2 = st.columns([3, 1])
 
+    with col2:
+        st.header("Model Tunning")
+        paramcol1, paramcol2 = st.columns(2)
+        for param in rf_tuning_features[:3]:
+            paramcol1.selectbox(
+                    f"{param}",
+                    options=list(defaults[param]),
+                    key=f"selected_{model}_{param}"
+                )
+        for param in rf_tuning_features[3:]:
+            paramcol2.selectbox(
+                    f"{param}",
+                    options=list(defaults[param]),
+                    key=f"selected_{model}_{param}"
+                )
+        st.divider()
+        st.header("Model Metrics")
+        for item in results["eval_results"]:
+                st.write(f"## {item["Metric"]}: :{item["Color"]}[{item["Value"]}]")
+    
     with col1:
         build_plot(results, plot_label)
-
-    with col2:
-        st.subheader("Model Metrics")
-        for key, value in results["eval_results"].items():
-            if isinstance(value, (int, float)):
-                st.write(f"{key}: {value:.4f}")
-            else:
-                st.write(f"{key}: {value}")
 
 
 def rf_view(data, selected_region, selected_state):
@@ -195,9 +245,10 @@ def rf_view(data, selected_region, selected_state):
             selected_cols=selected_features,
             level="region",
             region=selected_region,
-            test_periods=12
+            test_periods=12,
+            params=get_rf_params("rg")
         )
-        models_cols(result_region, selected_region)
+        models_cols(result_region, selected_region, "rg")
 
     with tab2:
         result_state = rf_model_pipeline(
@@ -206,9 +257,10 @@ def rf_view(data, selected_region, selected_state):
             selected_cols=selected_features,
             level="state",
             state=selected_state,
-            test_periods=12
+            test_periods=12,
+            params = get_rf_params("state")
         )
-        models_cols(result_state, selected_state.upper())
+        models_cols(result_state, selected_state.upper(), "state")
 
     with tab3:
         result_us = rf_model_pipeline(
@@ -216,19 +268,23 @@ def rf_view(data, selected_region, selected_state):
             dataset=data,
             selected_cols=selected_features,
             level="us",
-            test_periods=12
+            test_periods=12,
+            params = get_rf_params("aggr")
         )
-        models_cols(result_us, "Entire US")
+        models_cols(result_us, "Entire US", "aggr")
 
     with tab4:
-        with st.spinner("Loading model...", show_time=True):
-            rf_result = rf_panel_pipeline(
-                target_col="median_listing_price_x",
-                dataset=data,
-                selected_cols=panel_features,
-                selected_region=selected_region,
-                test_periods=12
-            )
-        models_cols(rf_result, f"US Train → {selected_region}")
+        st.warning('WARNING: Expected time to run is 3 minutes', icon="⚠️")
+        if st.button("Run Model"):
+            with st.spinner("Loading model...", show_time=True):
+                rf_result = rf_panel_pipeline(
+                    target_col="median_listing_price_x",
+                    dataset=data,
+                    selected_cols=panel_features,
+                    selected_region=selected_region,
+                    test_periods=12,
+                    params=get_rf_params("ust")
+                )
+            models_cols(rf_result, f"US Train → {selected_region}", "ust")
         
         

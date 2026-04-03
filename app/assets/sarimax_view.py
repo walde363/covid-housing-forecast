@@ -145,7 +145,7 @@ def sarimax_view(filtered_data, selected_region):
                 options=[0, 1],
                 key="selected_Q"
             )
-            
+            st.divider()
             st.header("Model Metrics")
             for item in result["eval_results"]:
                 st.write(f"## {item["Metric"]}: :{item["Color"]}[{item["Value"]}]")

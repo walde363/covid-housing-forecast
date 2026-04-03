@@ -265,8 +265,8 @@ with tab1:
 with tab2:
     sarimax_view(filtered_data, selected_region)
 
-# with tab3:
-#     rf_view(data, selected_region, selected_state)
+with tab3:
+    rf_view(data, selected_region, selected_state)
 
 # with tab4:
 #     xgb_view(data, selected_region, selected_state)

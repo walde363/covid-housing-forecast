@@ -86,6 +86,7 @@ def render_seasonal_naive(filtered_data, selected_region):
                 template="plotly_dark",
                 paper_bgcolor="#1E293B",
                 plot_bgcolor="#1E293B",
+                height=700,
                 font=dict(color="#F8FAFC"),
             )
             

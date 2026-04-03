@@ -12,6 +12,7 @@ from assets.seasonal_naive_view import render_seasonal_naive
 from assets.sarimax_view import sarimax_view
 from assets.rf_view import rf_view
 from assets.xgb_view import xgb_view
+from assets.choropleth_map import render_choropleth
 
 data = pd.read_csv("data/processed/processed_data_pre_model.csv")
 data["state"] = data["county_name_x"].str.split(", ").str[-1].str.lower()
@@ -31,7 +32,8 @@ selected_state = st.session_state.selected_state
 filtered_data = data[data["state"] == selected_state]
 
 st.write("Selected state:", selected_state)
-st.write("EDA for selected state data coming soon")
+
+render_choropleth(data, selected_state)
 
 regions = sorted(filtered_data["county_name_x"].dropna().unique().tolist())
 

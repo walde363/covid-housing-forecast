@@ -24,6 +24,61 @@ def mase(y_train, y_test, y_pred):
     return model_mae / naive_mae
 
 
+def get_metric_rating(metric_name, value):
+    """
+    Returns a qualitative rating and color for a metric value.
+
+    Returns
+    -------
+    tuple
+        (rating, color)
+    """
+
+    if np.isnan(value):
+        return "N/A", "gray"
+
+    metric_name = metric_name.upper()
+
+    # Higher is better
+    if metric_name == "R2":
+        if value >= 0.90:
+            return "Very Good", "green"
+        elif value >= 0.75:
+            return "Good", "yellow"
+        else:
+            return "Bad", "red"
+
+    # Lower is better
+    elif metric_name == "MAPE":
+        # sklearn returns MAPE as decimal, e.g. 0.08 = 8%
+        if value < 0.05:
+            return "Very Good", "green"
+        elif value < 0.10:
+            return "Good", "yellow"
+        else:
+            return "Bad", "red"
+
+    elif metric_name == "MASE":
+        if value < 0.60:
+            return "Very Good", "green"
+        elif value < 1.00:
+            return "Good", "yellow"
+        else:
+            return "Bad", "red"
+
+    elif metric_name in ["RMSE", "MSE", "MAE"]:
+        # These depend heavily on scale, so you may want to customize later
+        # For now, use a generic fallback
+        if value < 10000:
+            return "Very Good", "green"
+        elif value < 30000:
+            return "Good", "yellow"
+        else:
+            return "Bad", "red"
+
+    return "N/A", "gray"
+
+
 def evaluate_model(y_true, y_pred, model_name, metrics=None, train=None):
     """
     Evaluate a model using a configurable list of regression metrics.
@@ -44,8 +99,8 @@ def evaluate_model(y_true, y_pred, model_name, metrics=None, train=None):
 
     Returns
     -------
-    dict
-        Dictionary with model name and requested metric results.
+    list of dict
+        Each dict contains metric name, value, rating, and color.
     """
 
     if metrics is None:
@@ -72,7 +127,7 @@ def evaluate_model(y_true, y_pred, model_name, metrics=None, train=None):
         "mase": "MASE",
     }
 
-    results = {"Model": model_name}
+    results = []
 
     for metric in metrics:
         metric = metric.lower()
@@ -86,8 +141,19 @@ def evaluate_model(y_true, y_pred, model_name, metrics=None, train=None):
         if metric == "mase":
             if train is None:
                 raise ValueError("train must be provided when using 'mase'.")
-            results[metric_labels[metric]] = metric_functions[metric](train, y_true, y_pred)
+            value = metric_functions[metric](train, y_true, y_pred)
         else:
-            results[metric_labels[metric]] = metric_functions[metric](y_true, y_pred)
+            value = metric_functions[metric](y_true, y_pred)
+
+        label = metric_labels[metric]
+        rating, color = get_metric_rating(label, value)
+
+        results.append({
+            "Model": model_name,
+            "Metric": label,
+            "Value": value,
+            "Rating": rating,
+            "Color": color
+        })
 
     return results

@@ -93,10 +93,7 @@ def render_seasonal_naive(filtered_data, selected_region):
             st.plotly_chart(fig, width='stretch')
 
         with col2:
-            st.subheader("Model Metrics")
-            for key, value in result["eval_results"].items():
-                if isinstance(value, (int, float)):
-                    st.write(f"{key}: {value:.4f}")
-                else:
-                    st.write(f"{key}: {value}")
+            st.header("Model Metrics")
+            for item in result["eval_results"]:
+                st.write(f"## {item["Metric"]}: :{item["Color"]}[{item["Value"]}]")
                     

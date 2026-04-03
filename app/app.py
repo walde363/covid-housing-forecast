@@ -12,12 +12,24 @@ from assets.seasonal_naive_view import render_seasonal_naive
 from assets.sarimax_view import sarimax_view
 from assets.rf_view import rf_view
 from assets.xgb_view import xgb_view
+import time
 
 st.set_page_config(
     page_title="House Market Predictive Interactive Dashboard",
     page_icon="🏠",
     layout="wide"
 )
+
+st.markdown("""
+    <style>
+        .custom-container {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 @st.cache_data
 def load_data():
@@ -196,36 +208,32 @@ with col2:
     )
 
     if summary_state is not None:
-        st.write(f"**{st.session_state.selected_state} Snapshot**")
-        st.caption(f"Snapshot month: {summary_state['latest_date'].strftime('%Y-%m')}")
+        state_snapshot_container = st.container(border=True)
+        state_snapshot_container.write(f"**{st.session_state.selected_state} Snapshot**")
+        state_snapshot_container.caption(f"Snapshot month: {summary_state['latest_date'].strftime('%Y-%m')}")
 
-        s1, s2 = st.columns(2)
+        s1, s2 = state_snapshot_container.columns(2)
+
         with s1:
             st.metric("Median Listing Price", f"${summary_state['median_price']:,.0f}")
             st.metric("Inventory", f"{summary_state['inventory']:,.0f}")
-            # st.metric("New Listings", f"{summary_state['new_listings']:,.0f}")
+
         with s2:
             st.metric("Pending Ratio", f"{summary_state['pending_ratio']:.2f}")
             st.metric("Days on Market", f"{summary_state['days_on_market']:.1f}")
-            # if summary_state["price_yoy"] is not None:
-            #     st.metric("Price YoY", f"{summary_state['price_yoy']:.2f}%")
-
-    st.divider()
 
     if us_summary is not None:
-        st.write("**U.S. Snapshot**")
-        st.caption(f"Snapshot month: {us_summary['latest_date'].strftime('%Y-%m')}")
+        us_snapshot_container = st.container(border=True)
+        us_snapshot_container.write("**U.S. Snapshot**")
+        us_snapshot_container.caption(f"Snapshot month: {us_summary['latest_date'].strftime('%Y-%m')}")
 
-        u1, u2 = st.columns(2)
+        u1, u2 = us_snapshot_container.columns(2)
         with u1:
             st.metric("Median Listing Price", f"${us_summary['median_price']:,.0f}")
             st.metric("Inventory", f"{us_summary['inventory']:,.0f}")
-            # st.metric("New Listings", f"{us_summary['new_listings']:,.0f}")
         with u2:
             st.metric("Pending Ratio", f"{us_summary['pending_ratio']:.2f}")
             st.metric("Days on Market", f"{us_summary['days_on_market']:.1f}")
-            # if us_summary["price_yoy"] is not None:
-            #     st.metric("Price YoY", f"{us_summary['price_yoy']:.2f}%")
 
 selected_state = st.session_state.selected_state
 filtered_data = data[data["state"] == selected_state].copy()
@@ -251,7 +259,6 @@ selected_region = st.selectbox(
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT"]
 )
-
 with tab1:
     render_seasonal_naive(filtered_data, selected_region)
 

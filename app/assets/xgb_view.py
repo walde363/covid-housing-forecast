@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[0]
+sys.path.append(str(PROJECT_ROOT))
+
+from metrics_display import metrics_display
+
 import streamlit as st
 import plotly.graph_objects as go
 from src.xgb_model import xgb_model_pipeline
@@ -82,6 +90,43 @@ MODEL_APROACHES_MD_4 = """
 - Requires careful feature engineering
 """
 
+model_vars = ["rg_xgb", "state_xgb", "aggr_xgb", "ust_xgb"]
+
+xgb_tuning_features = [
+    "n_estimators",
+    "learning_rate",
+    "max_depth",
+    "min_child_weight",
+    "subsample",
+    "colsample_bytree"
+]
+
+xgb_param_grid = {
+    "n_estimators": [100, 300, 500],
+    "learning_rate": [0.01, 0.05, 0.1],
+    "max_depth": [3, 5, 7],
+    "min_child_weight": [1, 3, 5],
+    "subsample": [0.8, 1.0],
+    "colsample_bytree": [0.8, 1.0]
+}
+
+for i in model_vars:
+    for a in xgb_tuning_features:
+        key = f"selected_{i}_{a}"
+        if key not in st.session_state:
+            st.session_state[key] = xgb_param_grid[a][0]
+
+def get_xgb_params(prefix):
+    return {
+        "n_estimators": st.session_state[f"selected_{prefix}_n_estimators"],
+        "learning_rate": st.session_state[f"selected_{prefix}_learning_rate"],
+        "max_depth": st.session_state[f"selected_{prefix}_max_depth"],
+        "min_child_weight": st.session_state[f"selected_{prefix}_min_child_weight"],
+        "subsample": st.session_state[f"selected_{prefix}_subsample"],
+        "colsample_bytree": st.session_state[f"selected_{prefix}_colsample_bytree"],
+        "random_state": 42,
+        "n_jobs": 1
+    }
 
 def build_plot(result, plot_label):
     train = result["train"]
@@ -119,6 +164,7 @@ def build_plot(result, plot_label):
         template="plotly_dark",
         paper_bgcolor="#1E293B",
         plot_bgcolor="#1E293B",
+        height=700,
         font=dict(color="#F8FAFC"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
@@ -126,19 +172,29 @@ def build_plot(result, plot_label):
     st.plotly_chart(fig, width='stretch')
 
 
-def models_cols(results, plot_label):
+def models_cols(results, plot_label, model):
     col1, col2 = st.columns([3, 1])
 
     with col1:
         build_plot(results, plot_label)
 
     with col2:
-        st.subheader("Model Metrics")
-        for key, value in results["eval_results"].items():
-            if isinstance(value, (int, float)):
-                st.write(f"{key}: {value:.4f}")
-            else:
-                st.write(f"{key}: {value}")
+        st.header("Model Tunning")
+        paramcol1, paramcol2 = st.columns(2)
+        for param in xgb_tuning_features[:3]:
+            paramcol1.selectbox(
+                    f"{param}",
+                    options=list(xgb_param_grid[param]),
+                    key=f"selected_{model}_{param}"
+                )
+        for param in xgb_tuning_features[3:]:
+            paramcol2.selectbox(
+                    f"{param}",
+                    options=list(xgb_param_grid[param]),
+                    key=f"selected_{model}_{param}"
+                )
+        st.divider()
+        metrics_display(results["eval_results"])
 
 
 def xgb_view(data, selected_region, selected_state):
@@ -201,9 +257,10 @@ def xgb_view(data, selected_region, selected_state):
                 selected_cols=selected_features,
                 level="region",
                 region=selected_region,
-                test_periods=12
+                test_periods=12,
+                params=get_xgb_params("rg_xgb")
             )
-        models_cols(result_region, selected_region)
+        models_cols(result_region, selected_region, "rg_xgb")
 
     with tab2:
         with st.spinner("Loading model...", show_time=True):
@@ -213,9 +270,10 @@ def xgb_view(data, selected_region, selected_state):
                 selected_cols=selected_features,
                 level="state",
                 state=selected_state,
-                test_periods=12
+                test_periods=12,
+                params=get_xgb_params("state_xgb")
             )
-        models_cols(result_state, selected_state.upper())
+        models_cols(result_state, selected_state.upper(), "state_xgb")
 
     with tab3:
         with st.spinner("Loading model...", show_time=True):
@@ -224,9 +282,10 @@ def xgb_view(data, selected_region, selected_state):
                 dataset=data,
                 selected_cols=selected_features,
                 level="us",
-                test_periods=12
+                test_periods=12,
+                params=get_xgb_params("aggr_xgb")
             )
-        models_cols(result_us, "Entire US")
+        models_cols(result_us, "Entire US", "aggr_xgb")
 
     with tab4:
         with st.spinner("Loading model...", show_time=True):
@@ -235,7 +294,8 @@ def xgb_view(data, selected_region, selected_state):
                 dataset=data,
                 selected_cols=panel_features,
                 selected_region=selected_region,
-                test_periods=12
+                test_periods=12,
+                params=get_xgb_params("ust_xgb")
             )
-        models_cols(rf_result, f"US Train → {selected_region}")
+        models_cols(rf_result, f"US Train → {selected_region}", "ust_xgb")
         

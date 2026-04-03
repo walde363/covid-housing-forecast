@@ -6,14 +6,9 @@ from helpers.time_based_panel_split import time_based_panel_split
 from helpers.model_evaluator import evaluate_model
 
 
-def train_random_forest(X_train, y_train, X_test):
+def train_random_forest(X_train, y_train, X_test, params):
     model = RandomForestRegressor(
-        n_estimators=300,
-        max_depth=10,
-        min_samples_split=5,
-        min_samples_leaf=2,
-        random_state=42,
-        n_jobs=1
+        **params
     )
 
     model.fit(X_train, y_train)
@@ -27,9 +22,10 @@ def rf_panel_pipeline(
     dataset,
     selected_cols,
     selected_region,
+    params,
     region_col="county_name_x",
     state_col="state",
-    test_periods=12
+    test_periods=12,
 ):
     """
     Train RF on all US rows, predict only selected region.
@@ -52,7 +48,7 @@ def rf_panel_pipeline(
         test_periods=test_periods
     )
 
-    model, pred = train_random_forest(X_train, y_train, X_test)
+    model, pred = train_random_forest(X_train, y_train, X_test, params)
 
     evaluation_result = evaluate_model(
         y_true=y_test,

@@ -5,14 +5,9 @@ from helpers.prepare_tree_model_data import prepare_tree_model_data
 from helpers.time_based_train_test_split import time_based_train_test_split
 from helpers.model_evaluator import evaluate_model
 
-def train_random_forest(X_train, y_train, X_test):
+def train_random_forest(X_train, y_train, X_test, params):
     model = RandomForestRegressor(
-        n_estimators=300,
-        max_depth=10,
-        min_samples_split=5,
-        min_samples_leaf=2,
-        random_state=42,
-        n_jobs=1
+        **params
     )
     model.fit(X_train, y_train)
     predictions = model.predict(X_test)
@@ -22,6 +17,7 @@ def rf_model_pipeline(
     target_col,
     dataset,
     selected_cols,
+    params,
     level="region",
     region=None,
     state=None,
@@ -47,7 +43,7 @@ def rf_model_pipeline(
         add_features=True
     )
 
-    model, pred = train_random_forest(X_train, y_train, X_test)
+    model, pred = train_random_forest(X_train, y_train, X_test, params)
 
     evaluation_result = evaluate_model(
         y_true=y_test,

@@ -13,22 +13,222 @@ from assets.sarimax_view import sarimax_view
 from assets.rf_view import rf_view
 from assets.xgb_view import xgb_view
 
-data = pd.read_csv("data/processed/processed_data_pre_model.csv")
-data["state"] = data["county_name_x"].str.split(", ").str[-1].str.lower()
-data = data.drop(columns=[col for col in data.columns if "_mm" in col or "_yy" in col])
-
 st.set_page_config(
     page_title="House Market Predictive Interactive Dashboard",
     page_icon="🏠",
     layout="wide"
 )
 
+@st.cache_data
+def load_data():
+    data = pd.read_csv("data/processed/processed_data_pre_model.csv")
+    data["state"] = data["county_name_x"].str.split(", ").str[-1].str.upper()
+    data = data.drop(columns=[col for col in data.columns if "_mm" in col or "_yy" in col])
+    data["date"] = pd.to_datetime(data["date"])
+    data["year"] = data["date"].dt.year
+    data["month"] = data["date"].dt.month
+    data["quarter"] = data["date"].dt.quarter
+    return data
+
+def get_state_market_summary(data, selected_state, selected_year, selected_month):
+    df = data[
+        (data["state"] == selected_state) &
+        (data["year"] == selected_year) & 
+        (data["month"] == selected_month)
+    ].copy()
+
+    if df.empty:
+        return None
+
+    latest_date = df["date"].max()
+    snapshot_df = df[df["date"] == latest_date].copy()
+
+    summary = {
+        "latest_date": latest_date,
+        "median_price": snapshot_df["median_listing_price_x"].mean(),
+        "inventory": snapshot_df["active_listing_count"].sum(),
+        "new_listings": snapshot_df["new_listing_count"].sum(),
+        "pending_ratio": snapshot_df["pending_ratio"].mean(),
+        "days_on_market": snapshot_df["median_days_on_market_x"].mean(),
+    }
+
+    all_state_df = data[data["state"] == selected_state].copy()
+    year_ago_date = latest_date - pd.DateOffset(years=1)
+
+    latest_price = snapshot_df["median_listing_price_x"].mean()
+    year_ago_df = all_state_df[all_state_df["date"] == year_ago_date].copy()
+
+    if not year_ago_df.empty:
+        year_ago_price = year_ago_df["median_listing_price_x"].mean()
+        summary["price_yoy"] = (
+            ((latest_price - year_ago_price) / year_ago_price) * 100
+            if year_ago_price != 0 else None
+        )
+    else:
+        summary["price_yoy"] = None
+
+    latest_inventory = snapshot_df["active_listing_count"].sum()
+    year_ago_inventory_df = all_state_df[all_state_df["date"] == year_ago_date].copy()
+
+    if not year_ago_inventory_df.empty:
+        year_ago_inventory = year_ago_inventory_df["active_listing_count"].sum()
+        summary["inventory_yoy"] = (
+            ((latest_inventory - year_ago_inventory) / year_ago_inventory) * 100
+            if year_ago_inventory != 0 else None
+        )
+    else:
+        summary["inventory_yoy"] = None
+
+    return summary
+
+def get_market_summary(df):
+    if df.empty:
+        return None
+
+    latest_date = df["date"].max()
+    snapshot_df = df[df["date"] == latest_date].copy()
+
+    summary = {
+        "latest_date": latest_date,
+        "median_price": snapshot_df["median_listing_price_x"].mean(),
+        "inventory": snapshot_df["active_listing_count"].sum(),
+        "new_listings": snapshot_df["new_listing_count"].sum(),
+        "pending_ratio": snapshot_df["pending_ratio"].mean(),
+        "days_on_market": snapshot_df["median_days_on_market_x"].mean(),
+    }
+
+    year_ago_date = latest_date - pd.DateOffset(years=1)
+    year_ago_df = df[df["date"] == year_ago_date].copy()
+
+    if not year_ago_df.empty:
+        year_ago_price = year_ago_df["median_listing_price_x"].mean()
+        year_ago_inventory = year_ago_df["active_listing_count"].sum()
+
+        summary["price_yoy"] = (
+            ((summary["median_price"] - year_ago_price) / year_ago_price) * 100
+            if year_ago_price != 0 else None
+        )
+        summary["inventory_yoy"] = (
+            ((summary["inventory"] - year_ago_inventory) / year_ago_inventory) * 100
+            if year_ago_inventory != 0 else None
+        )
+    else:
+        summary["price_yoy"] = None
+        summary["inventory_yoy"] = None
+
+    return summary
+
+data = load_data()
+
 st.title("House Market Interactive Dashboard")
 
-state_map()
+if "selected_state" not in st.session_state:
+    st.session_state.selected_state = "FL"
+
+if "selected_year" not in st.session_state:
+    st.session_state.selected_year = 2026
+
+if "selected_month" not in st.session_state:
+    st.session_state.selected_month = 1
+    
+month_options = sorted(
+    data.loc[data["year"] == st.session_state.selected_year, "month"]
+    .dropna()
+    .unique()
+    .tolist()
+)
+
+if st.session_state.selected_month not in month_options:
+    st.session_state.selected_month = month_options[0]
+
+if st.session_state.selected_month not in month_options:
+    st.session_state.selected_month = month_options[0]
+
+# create filtered_data BEFORE summaries
+selected_state = st.session_state.selected_state
+filtered_data = data[data["state"] == selected_state].copy()
+
+summary_state = get_state_market_summary(
+    data,
+    st.session_state.selected_state,
+    st.session_state.selected_year,
+    st.session_state.selected_month
+)
+
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    state_map(data[["state", "year", "median_listing_price_x"]])
+
+with col2:
+    col_a, col_b, col_c = st.columns(3)
+
+    with col_a:
+        st.selectbox(
+            "Select a state",
+            options=sorted(data["state"].dropna().unique().tolist()),
+            key="selected_state"
+        )
+    with col_b:
+        st.selectbox(
+            "Select a year",
+            options=sorted(data["year"].dropna().unique().tolist()),
+            key="selected_year"
+        )
+    with col_c:
+        st.selectbox(
+            "Select a month",
+            options=month_options,
+            key="selected_month"
+        )
+
+    state_summary = get_market_summary(
+        data[
+            (data["state"] == st.session_state.selected_state) &
+            (data["year"] == st.session_state.selected_year) & 
+            (data["month"] == st.session_state.selected_month)
+        ].copy()
+    )
+
+    us_summary = get_market_summary(
+        data[(data["year"] == st.session_state.selected_year) & 
+            (data["month"] == st.session_state.selected_month)].copy()
+    )
+
+    if summary_state is not None:
+        st.write(f"**{st.session_state.selected_state} Snapshot**")
+        st.caption(f"Snapshot month: {summary_state['latest_date'].strftime('%Y-%m')}")
+
+        s1, s2 = st.columns(2)
+        with s1:
+            st.metric("Median Listing Price", f"${summary_state['median_price']:,.0f}")
+            st.metric("Inventory", f"{summary_state['inventory']:,.0f}")
+            # st.metric("New Listings", f"{summary_state['new_listings']:,.0f}")
+        with s2:
+            st.metric("Pending Ratio", f"{summary_state['pending_ratio']:.2f}")
+            st.metric("Days on Market", f"{summary_state['days_on_market']:.1f}")
+            # if summary_state["price_yoy"] is not None:
+            #     st.metric("Price YoY", f"{summary_state['price_yoy']:.2f}%")
+
+    st.divider()
+
+    if us_summary is not None:
+        st.write("**U.S. Snapshot**")
+        st.caption(f"Snapshot month: {us_summary['latest_date'].strftime('%Y-%m')}")
+
+        u1, u2 = st.columns(2)
+        with u1:
+            st.metric("Median Listing Price", f"${us_summary['median_price']:,.0f}")
+            st.metric("Inventory", f"{us_summary['inventory']:,.0f}")
+            # st.metric("New Listings", f"{us_summary['new_listings']:,.0f}")
+        with u2:
+            st.metric("Pending Ratio", f"{us_summary['pending_ratio']:.2f}")
+            st.metric("Days on Market", f"{us_summary['days_on_market']:.1f}")
+            # if us_summary["price_yoy"] is not None:
+            #     st.metric("Price YoY", f"{us_summary['price_yoy']:.2f}%")
 
 selected_state = st.session_state.selected_state
-filtered_data = data[data["state"] == selected_state]
+filtered_data = data[data["state"] == selected_state].copy()
 
 st.write("Selected state:", selected_state)
 st.write("EDA for selected state data coming soon")
@@ -37,12 +237,16 @@ regions = sorted(filtered_data["county_name_x"].dropna().unique().tolist())
 
 if not regions:
     st.warning("No regions found for the selected state.")
-    
+    st.stop()
+
+if "region" not in st.session_state or st.session_state.region not in regions:
+    st.session_state.region = regions[0]
+
 selected_region = st.selectbox(
-            "Select Region",
-            regions,
-            key="region"
-        )
+    "Select Region",
+    regions,
+    key="region"
+)
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT"]

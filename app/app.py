@@ -12,6 +12,7 @@ from assets.seasonal_naive_view import render_seasonal_naive
 from assets.sarimax_view import sarimax_view
 from assets.rf_view import rf_view
 from assets.xgb_view import xgb_view
+from assets.prophet_view import prophet_view
 import time
 
 st.set_page_config(
@@ -257,8 +258,8 @@ selected_region = st.selectbox(
     key="region"
 )
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT", "Prophet"]
 )
 with tab1:
     render_seasonal_naive(filtered_data, selected_region)
@@ -274,3 +275,6 @@ with tab4:
 
 with tab5:
     st.write("In progress")
+
+with tab6:
+    prophet_view(data, selected_region, selected_state)

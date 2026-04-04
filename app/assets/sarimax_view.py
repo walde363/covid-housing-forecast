@@ -112,7 +112,7 @@ def sarimax_view(filtered_data, selected_region):
             st.plotly_chart(fig, width='stretch')
 
         with col2:
-            st.header("Model Tunning")
+            st.header("Model Tuning")
             pcol, dcol, qcol = st.columns(3)
             with pcol:
                 st.selectbox(

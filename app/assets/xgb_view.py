@@ -174,7 +174,7 @@ def models_cols(results, plot_label, model):
         build_plot(results, plot_label)
 
     with col2:
-        st.header("Model Tunning")
+        st.header("Model Tuning")
         paramcol1, paramcol2 = st.columns(2)
         for param in xgb_tuning_features[:3]:
             paramcol1.selectbox(

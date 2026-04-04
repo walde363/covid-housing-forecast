@@ -167,7 +167,7 @@ def models_cols(results, plot_label, model):
     col1, col2 = st.columns([3, 1])
 
     with col2:
-        st.header("Model Tunning")
+        st.header("Model Tuning")
         paramcol1, paramcol2 = st.columns(2)
         for param in rf_tuning_features[:3]:
             paramcol1.selectbox(

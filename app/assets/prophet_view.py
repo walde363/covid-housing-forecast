@@ -108,6 +108,7 @@ def build_plot(result, plot_label):
     train = result["train"]
     test = result["test"]
     forecast = result["forecast"]
+    future_forecast = result.get("future_forecast", None)
 
     fig = go.Figure()
 
@@ -131,6 +132,15 @@ def build_plot(result, plot_label):
         mode="lines+markers",
         name="Predicted"
     ))
+    
+    if future_forecast is not None:
+        fig.add_trace(go.Scatter(
+            x=future_forecast.index,
+            y=future_forecast.values,
+            mode="lines+markers",
+            line=dict(dash='dot'),
+            name="18-Month Forward Forecast"
+        ))
 
     fig.update_layout(
         title=f"Median Listing Price: Actual vs Predicted ({plot_label})",

@@ -13,6 +13,7 @@ from assets.sarimax_view import sarimax_view
 from assets.rf_view import rf_view
 from assets.xgb_view import xgb_view
 from assets.prophet_view import prophet_view
+from assets.choropleth_map import render_choropleth
 import time
 
 st.set_page_config(

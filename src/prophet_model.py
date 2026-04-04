@@ -63,6 +63,19 @@ def prophet_model_pipeline(
         train=train_df['y'].values
     )
 
+    # 18-month forward projection
+    # Model was fit on train_df, so test_periods + 18 gives us test_df range + 18 future months
+    future_df_18m = model.make_future_dataframe(periods=test_periods + 18, freq='MS')
+    forecast_18m = model.predict(future_df_18m)
+    
+    last_test_date = test_df['ds'].max()
+    future_only = forecast_18m[forecast_18m['ds'] > last_test_date]
+    future_forecast = pd.Series(
+        future_only['yhat'].values,
+        index=future_only['ds'],
+        name="future_forecast"
+    )
+
     train = train_df.set_index("ds")['y']
     test = test_df.set_index("ds")['y']
 
@@ -75,6 +88,7 @@ def prophet_model_pipeline(
     return {
         "model": model,
         "forecast": forecast,
+        "future_forecast": future_forecast,
         "train": train,
         "test": test,
         "eval_results": evaluation_result,

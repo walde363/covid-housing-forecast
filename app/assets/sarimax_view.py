@@ -38,13 +38,12 @@ MODEL_OVERVIEW_MD_SARIMAX_2 = """
 - Sensitive to data quality and missing values
 """
 
-vals = ["p", "d", "q", "P", "D", "Q"]
-
-for i in vals:
-    if f"selected_{i}" not in st.session_state:
-        st.session_state[f"selected_{i}"] = 1  
-
 def sarimax_view(filtered_data, selected_region):
+    vals = ["p", "d", "q", "P", "D", "Q"]
+    for i in vals:
+        if f"selected_{i}" not in st.session_state:
+            st.session_state[f"selected_{i}"] = 1  
+
     with st.container():
         st.header("SARIMAX Model")
         with st.expander("📘 Model Overview"):

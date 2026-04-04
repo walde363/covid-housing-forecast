@@ -63,16 +63,19 @@ def prophet_model_pipeline(
         train=train_df['y'].values
     )
 
-    # 18-month forward projection
-    # Model was fit on train_df, so test_periods + 18 gives us test_df range + 18 future months
-    future_df_18m = model.make_future_dataframe(periods=test_periods + 18, freq='MS')
+    # 18-month forward projection from the end of the test set
+    last_test_date = test_df['ds'].max()
+    
+    # Generate exactly 18 months starting the month AFTER the last test date
+    # M defaults to month-end, MS is month-start. We use MS since real estate data is usually YYYY-MM-01.
+    future_dates = pd.date_range(start=last_test_date, periods=18 + 1, freq='MS')[1:]
+    future_df_18m = pd.DataFrame({'ds': future_dates})
+    
     forecast_18m = model.predict(future_df_18m)
     
-    last_test_date = test_df['ds'].max()
-    future_only = forecast_18m[forecast_18m['ds'] > last_test_date]
     future_forecast = pd.Series(
-        future_only['yhat'].values,
-        index=future_only['ds'],
+        forecast_18m['yhat'].values,
+        index=forecast_18m['ds'],
         name="future_forecast"
     )
 

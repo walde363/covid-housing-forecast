@@ -88,11 +88,7 @@ prophet_param_grid = {
     "yearly_seasonality": [True, False]
 }
 
-for i in model_vars:
-    for a in prophet_tuning_features:
-        key = f"selected_{i}_{a}"
-        if key not in st.session_state:
-            st.session_state[key] = prophet_param_grid[a][0]
+
 
 def get_prophet_params(prefix):
     return {
@@ -133,7 +129,7 @@ def build_plot(result, plot_label):
         name="Predicted"
     ))
     
-    if future_forecast is not None:
+    if future_forecast is not None and not future_forecast.empty:
         fig.add_trace(go.Scatter(
             x=future_forecast.index,
             y=future_forecast.values,
@@ -184,6 +180,12 @@ def models_cols(results, plot_label, model):
 
 
 def prophet_view(data, selected_region, selected_state):
+    for i in model_vars:
+        for a in prophet_tuning_features:
+            key = f"selected_{i}_{a}"
+            if key not in st.session_state:
+                st.session_state[key] = prophet_param_grid[a][0]
+                
     st.header("Prophet Forecasting Model")
     
     with st.expander("📘 Model Overview"):

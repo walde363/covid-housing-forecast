@@ -110,11 +110,6 @@ xgb_param_grid = {
     "colsample_bytree": [0.8, 1.0]
 }
 
-for i in model_vars:
-    for a in xgb_tuning_features:
-        key = f"selected_{i}_{a}"
-        if key not in st.session_state:
-            st.session_state[key] = xgb_param_grid[a][0]
 
 def get_xgb_params(prefix):
     return {
@@ -198,6 +193,12 @@ def models_cols(results, plot_label, model):
 
 
 def xgb_view(data, selected_region, selected_state):
+    for i in model_vars:
+        for a in xgb_tuning_features:
+            key = f"selected_{i}_{a}"
+            if key not in st.session_state:
+                st.session_state[key] = xgb_param_grid[a][0]
+
     st.header("XGBoost Regressor Model")
     
     with st.expander("📘 Model Overview"):

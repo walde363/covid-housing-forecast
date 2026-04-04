@@ -105,11 +105,7 @@ defaults = {
     "bootstrap": [True, False]
 }
 
-for i in model_vars:
-    for a in rf_tuning_features:
-        key = f"selected_{i}_{a}"
-        if key not in st.session_state:
-            st.session_state[key] = defaults[a][0]
+
 
 def get_rf_params(prefix):
     return {
@@ -193,6 +189,12 @@ def models_cols(results, plot_label, model):
 
 
 def rf_view(data, selected_region, selected_state):
+    for i in model_vars:
+        for a in rf_tuning_features:
+            key = f"selected_{i}_{a}"
+            if key not in st.session_state:
+                st.session_state[key] = defaults[a][0]
+                
     st.header("Random Forest Regressor Model")
     
     with st.expander("📘 Model Overview"):

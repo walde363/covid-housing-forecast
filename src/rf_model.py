@@ -4,14 +4,50 @@ from sklearn.ensemble import RandomForestRegressor
 from helpers.prepare_tree_model_data import prepare_tree_model_data
 from helpers.time_based_train_test_split import time_based_train_test_split
 from helpers.model_evaluator import evaluate_model
+from helpers.add_time_features import add_time_features
+
 
 def train_random_forest(X_train, y_train, X_test, params):
-    model = RandomForestRegressor(
-        **params
-    )
+    model = RandomForestRegressor(**params)
     model.fit(X_train, y_train)
     predictions = model.predict(X_test)
     return model, predictions
+
+def recursive_rf_forecast(model, df_model, target_col, feature_cols, steps=18):
+    history = df_model.copy()
+    history["date"] = pd.to_datetime(history["date"])
+    history = history.sort_values("date").reset_index(drop=True)
+
+    base_cols = history.columns.tolist()
+    carry_forward_cols = [col for col in base_cols if col not in ["date", target_col]]
+
+    future_predictions = []
+
+    for _ in range(steps):
+        last_date = history["date"].max()
+        next_date = last_date + pd.offsets.MonthBegin(1)
+
+        new_row = {col: pd.NA for col in base_cols}
+        new_row["date"] = next_date
+        history = pd.concat([history, pd.DataFrame([new_row])], ignore_index=True)
+
+        for col in carry_forward_cols:
+            history.loc[history.index[-1], col] = history.loc[history.index[-2], col]
+
+        history = add_time_features(history, target_col=target_col)
+
+        next_row_features = history.iloc[[-1]][feature_cols].copy()
+        pred = model.predict(next_row_features)[0]
+
+        history.loc[history.index[-1], target_col] = pred
+        future_predictions.append((next_date, pred))
+
+    return pd.Series(
+        [pred for _, pred in future_predictions],
+        index=[date for date, _ in future_predictions],
+        name="future_forecast"
+    )
+
 
 def rf_model_pipeline(
     target_col,
@@ -61,10 +97,21 @@ def rf_model_pipeline(
         index=test.index,
         name="forecast"
     )
+    
+    future_source = df_model[df_model["date"] <= test.index.max()].copy()
+
+    future_forecast = recursive_rf_forecast(
+        model=model,
+        df_model=future_source,
+        target_col=target_col,
+        feature_cols=X_train.columns.tolist(),
+        steps=18
+    )
 
     return {
         "model": model,
         "forecast": forecast,
+        "future_forecast": future_forecast,
         "train": train,
         "test": test,
         "eval_results": evaluation_result,
@@ -74,3 +121,4 @@ def rf_model_pipeline(
         "y_test": y_test,
         "df_model": df_model
     }
+    

@@ -11,24 +11,6 @@ def prepare_panel_model_data(
     """
     Prepare panel data for tree models.
     Keeps all US rows, one row per region-date.
-
-    Parameters
-    ----------
-    dataset : pd.DataFrame
-        Full dataset.
-    target_col : str
-        Target column.
-    selected_cols : list
-        Predictor columns to keep.
-    region_col : str
-        Region identifier column.
-    state_col : str
-        State identifier column.
-
-    Returns
-    -------
-    pd.DataFrame
-        Clean panel dataframe.
     """
 
     required_cols = ["date", region_col, state_col, target_col]
@@ -45,5 +27,9 @@ def prepare_panel_model_data(
     df[state_col] = df[state_col].astype(str).str.lower().str.strip()
 
     df = df.sort_values([region_col, "date"]).reset_index(drop=True)
+
+    # add encoded columns here
+    df["region_code"] = df[region_col].astype("category").cat.codes
+    df["state_code"] = df[state_col].astype("category").cat.codes
 
     return df

@@ -110,11 +110,6 @@ xgb_param_grid = {
     "colsample_bytree": [0.8, 1.0]
 }
 
-for i in model_vars:
-    for a in xgb_tuning_features:
-        key = f"selected_{i}_{a}"
-        if key not in st.session_state:
-            st.session_state[key] = xgb_param_grid[a][0]
 
 def get_xgb_params(prefix):
     return {
@@ -132,6 +127,7 @@ def build_plot(result, plot_label):
     train = result["train"]
     test = result["test"]
     forecast = result["forecast"]
+    future_forecast = result.get("future_forecast", None)
 
     fig = go.Figure()
 
@@ -155,6 +151,15 @@ def build_plot(result, plot_label):
         mode="lines+markers",
         name="Predicted"
     ))
+    
+    if future_forecast is not None and not future_forecast.empty:
+        fig.add_trace(go.Scatter(
+            x=future_forecast.index,
+            y=future_forecast.values,
+            mode="lines+markers",
+            line=dict(dash="dot"),
+            name="18-Month Forward Forecast"
+        ))
 
     fig.update_layout(
         title=f"Median Listing Price: Actual vs Predicted ({plot_label})",
@@ -179,7 +184,7 @@ def models_cols(results, plot_label, model):
         build_plot(results, plot_label)
 
     with col2:
-        st.header("Model Tunning")
+        st.header("Model Tuning")
         paramcol1, paramcol2 = st.columns(2)
         for param in xgb_tuning_features[:3]:
             paramcol1.selectbox(
@@ -198,6 +203,12 @@ def models_cols(results, plot_label, model):
 
 
 def xgb_view(data, selected_region, selected_state):
+    for i in model_vars:
+        for a in xgb_tuning_features:
+            key = f"selected_{i}_{a}"
+            if key not in st.session_state:
+                st.session_state[key] = xgb_param_grid[a][0]
+
     st.header("XGBoost Regressor Model")
     
     with st.expander("📘 Model Overview"):

@@ -37,10 +37,21 @@ def seasonal_naive_model(data, target, filter_col, filter_by, periods):
         train=train
     )
     
+    last_test_date = test.index.max()
+    future_dates = pd.date_range(start=last_test_date, periods=18 + 1, freq='MS')[1:]
+    
+    forecast_period = 18
+    future_forecast = []
+    train_18m = selected_target.values
+    for month in range(forecast_period):
+        future_forecast.append(train_18m[-forecast_period + (month % forecast_period)])
+    
     return {
         "forecast": forecast,
         "train": train,
         "test": test,
+        "future_forecast": future_forecast,
+        "future_forecast_dates" : future_dates,
         "eval_results": evaluation_result
     }
     

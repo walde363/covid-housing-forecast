@@ -12,6 +12,8 @@ from assets.seasonal_naive_view import render_seasonal_naive
 from assets.sarimax_view import sarimax_view
 from assets.rf_view import rf_view
 from assets.xgb_view import xgb_view
+from assets.prophet_view import prophet_view
+# from assets.choropleth_map import render_choropleth
 import time
 
 st.set_page_config(
@@ -239,7 +241,8 @@ selected_state = st.session_state.selected_state
 filtered_data = data[data["state"] == selected_state].copy()
 
 st.write("Selected state:", selected_state)
-st.write("EDA for selected state data coming soon")
+
+# render_choropleth(data, selected_state)
 
 regions = sorted(filtered_data["county_name_x"].dropna().unique().tolist())
 
@@ -256,14 +259,14 @@ selected_region = st.selectbox(
     key="region"
 )
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT", "Prophet"]
 )
 with tab1:
     render_seasonal_naive(filtered_data, selected_region)
 
 with tab2:
-    sarimax_view(filtered_data, selected_region)
+    sarimax_view(data, selected_region, selected_state)
 
 with tab3:
     rf_view(data, selected_region, selected_state)
@@ -273,3 +276,6 @@ with tab4:
 
 with tab5:
     st.write("In progress")
+
+with tab6:
+    prophet_view(data, selected_region, selected_state)

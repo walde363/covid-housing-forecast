@@ -105,11 +105,7 @@ defaults = {
     "bootstrap": [True, False]
 }
 
-for i in model_vars:
-    for a in rf_tuning_features:
-        key = f"selected_{i}_{a}"
-        if key not in st.session_state:
-            st.session_state[key] = defaults[a][0]
+
 
 def get_rf_params(prefix):
     return {
@@ -127,6 +123,7 @@ def build_plot(result, plot_label):
     train = result["train"]
     test = result["test"]
     forecast = result["forecast"]
+    future_forecast = result.get("future_forecast", None)
 
     fig = go.Figure()
 
@@ -151,6 +148,15 @@ def build_plot(result, plot_label):
         name="Predicted"
     ))
 
+    if future_forecast is not None and not future_forecast.empty:
+        fig.add_trace(go.Scatter(
+            x=future_forecast.index,
+            y=future_forecast.values,
+            mode="lines+markers",
+            line=dict(dash="dot"),
+            name="18-Month Forward Forecast"
+        ))
+
     fig.update_layout(
         title=f"Median Listing Price: Actual vs Predicted ({plot_label})",
         xaxis_title="Date",
@@ -164,14 +170,14 @@ def build_plot(result, plot_label):
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
 
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
 
 def models_cols(results, plot_label, model):
     col1, col2 = st.columns([3, 1])
 
     with col2:
-        st.header("Model Tunning")
+        st.header("Model Tuning")
         paramcol1, paramcol2 = st.columns(2)
         for param in rf_tuning_features[:3]:
             paramcol1.selectbox(
@@ -193,6 +199,12 @@ def models_cols(results, plot_label, model):
 
 
 def rf_view(data, selected_region, selected_state):
+    for i in model_vars:
+        for a in rf_tuning_features:
+            key = f"selected_{i}_{a}"
+            if key not in st.session_state:
+                st.session_state[key] = defaults[a][0]
+                
     st.header("Random Forest Regressor Model")
     
     with st.expander("📘 Model Overview"):
@@ -292,5 +304,4 @@ def rf_view(data, selected_region, selected_state):
                     params=get_rf_params("ust_rf")
                 )
             models_cols(rf_result, f"US Train → {selected_region}", "ust_rf")
-        
         

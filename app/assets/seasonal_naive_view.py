@@ -59,7 +59,9 @@ def render_seasonal_naive(filtered_data, selected_region):
         train = result["train"]
         test = result["test"]
         forecast = result["forecast"]
-
+        future_forecast = result["future_forecast"]
+        future_forecast_dates = result["future_forecast_dates"]
+    
         col1, col2 = st.columns([3, 1])
 
         with col1:
@@ -85,6 +87,14 @@ def render_seasonal_naive(filtered_data, selected_region):
                 mode="lines+markers",
                 name="Predicted"
             ))
+            
+            fig.add_trace(go.Scatter(
+                x=future_forecast_dates,
+                y=future_forecast,
+                mode="lines+markers",
+                line=dict(dash='dot'),
+                name="18-Month Forward Forecast"
+            ))
 
             fig.update_layout(
                 title=f"Median Listing Price: Actual vs Predicted ({selected_region})",
@@ -96,6 +106,7 @@ def render_seasonal_naive(filtered_data, selected_region):
                 plot_bgcolor="#1E293B",
                 height=700,
                 font=dict(color="#F8FAFC"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
             
 

@@ -266,7 +266,7 @@ with tab1:
     render_seasonal_naive(filtered_data, selected_region)
 
 with tab2:
-    sarimax_view(filtered_data, selected_region)
+    sarimax_view(data, selected_region, selected_state)
 
 with tab3:
     rf_view(data, selected_region, selected_state)

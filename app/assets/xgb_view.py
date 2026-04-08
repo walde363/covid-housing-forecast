@@ -104,24 +104,24 @@ xgb_tuning_features = [
 ]
 
 xgb_param_grid = {
-    "n_estimators": [100, 300, 500],
-    "learning_rate": [0.01, 0.05, 0.1],
-    "max_depth": [3, 5, 7],
-    "min_child_weight": [1, 3, 5],
+    "n_estimators": [100, 300],
+    "learning_rate": [0.05, 0.1],
+    "max_depth": [3, 6],
+    "min_child_weight": [1, 5],
     "subsample": [0.8, 1.0],
-    "colsample_bytree": [0.8, 1.0]
+    "colsample_bytree": [1.0]
 }
 
 
 def get_xgb_params(prefix, region=None):
     suffix = f"_{region}" if region else ""
     return {
-        "n_estimators": st.session_state[f"selected_{prefix}{suffix}_n_estimators"],
-        "learning_rate": st.session_state[f"selected_{prefix}{suffix}_learning_rate"],
-        "max_depth": st.session_state[f"selected_{prefix}{suffix}_max_depth"],
-        "min_child_weight": st.session_state[f"selected_{prefix}{suffix}_min_child_weight"],
-        "subsample": st.session_state[f"selected_{prefix}{suffix}_subsample"],
-        "colsample_bytree": st.session_state[f"selected_{prefix}{suffix}_colsample_bytree"],
+        "n_estimators": int(st.session_state[f"selected_{prefix}{suffix}_n_estimators"]),
+        "learning_rate": float(st.session_state[f"selected_{prefix}{suffix}_learning_rate"]),
+        "max_depth": int(st.session_state[f"selected_{prefix}{suffix}_max_depth"]),
+        "min_child_weight": float(st.session_state[f"selected_{prefix}{suffix}_min_child_weight"]),
+        "subsample": float(st.session_state[f"selected_{prefix}{suffix}_subsample"]),
+        "colsample_bytree": float(st.session_state[f"selected_{prefix}{suffix}_colsample_bytree"]),
         "random_state": 42,
         "n_jobs": -1
     }
@@ -170,8 +170,6 @@ def build_plot(result, plot_label):
         yaxis_title="Price",
         hovermode="x unified",
         template="plotly_dark",
-        paper_bgcolor="#1E293B",
-        plot_bgcolor="#1E293B",
         height=700,
         font=dict(color="#F8FAFC"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -263,7 +261,10 @@ def xgb_view(data, selected_regions, selected_state):
                     key = f"selected_{model_prefix}_{region}_{param}"
                     if key not in st.session_state:
                         if res_key in st.session_state and not st.session_state[res_key].empty:
-                            st.session_state[key] = st.session_state[res_key].iloc[0][param]
+                            val = st.session_state[res_key].iloc[0][param]
+                            if param in ["n_estimators", "max_depth"]:
+                                val = int(val)
+                            st.session_state[key] = val
                         else:
                             st.session_state[key] = xgb_param_grid[param][0]
         else:
@@ -271,7 +272,10 @@ def xgb_view(data, selected_regions, selected_state):
             if tuning_results_key in st.session_state and not st.session_state[tuning_results_key].empty:
                 best_params = st.session_state[tuning_results_key].iloc[0]
                 for param_name in xgb_tuning_features:
-                    st.session_state[f"selected_{model_prefix}_{param_name}"] = best_params[param_name]
+                    val = best_params[param_name]
+                    if param_name in ["n_estimators", "max_depth"]:
+                        val = int(val)
+                    st.session_state[f"selected_{model_prefix}_{param_name}"] = val
             else:
                 for a in xgb_tuning_features:
                     key = f"selected_{model_prefix}_{a}"

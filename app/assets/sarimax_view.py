@@ -84,12 +84,12 @@ model_vars = ["rg_sarimax", "state_sarimax", "aggr_sarimax"]
 sarimax_tuning_features = ["p", "d", "q", "P", "D", "Q"]
 
 sarimax_param_grid = {
-    "p": [0, 1, 2],
-    "d": [0, 1],
-    "q": [0, 1, 2],
+    "p": [0, 1],
+    "d": [1],
+    "q": [0, 1],
     "P": [0, 1],
-    "D": [0, 1],
-    "Q": [0, 1]
+    "D": [1],
+    "Q": [0]
 }
 
 
@@ -97,14 +97,14 @@ def get_sarimax_params(prefix, region=None):
     suffix = f"_{region}" if region else ""
     return {
         "order": (
-            st.session_state[f"selected_{prefix}{suffix}_p"],
-            st.session_state[f"selected_{prefix}{suffix}_d"],
-            st.session_state[f"selected_{prefix}{suffix}_q"]
+            int(st.session_state[f"selected_{prefix}{suffix}_p"]),
+            int(st.session_state[f"selected_{prefix}{suffix}_d"]),
+            int(st.session_state[f"selected_{prefix}{suffix}_q"])
         ),
         "seasonal_order": (
-            st.session_state[f"selected_{prefix}{suffix}_P"],
-            st.session_state[f"selected_{prefix}{suffix}_D"],
-            st.session_state[f"selected_{prefix}{suffix}_Q"],
+            int(st.session_state[f"selected_{prefix}{suffix}_P"]),
+            int(st.session_state[f"selected_{prefix}{suffix}_D"]),
+            int(st.session_state[f"selected_{prefix}{suffix}_Q"]),
             12
         ),
         "enforce_stationarity": False,
@@ -156,8 +156,6 @@ def build_plot(result, plot_label):
         yaxis_title="Price",
         hovermode="x unified",
         template="plotly_dark",
-        paper_bgcolor="#1E293B",
-        plot_bgcolor="#1E293B",
         font=dict(color="#F8FAFC"),
         height=700,
         legend=dict(
@@ -281,7 +279,7 @@ def sarimax_view(data, selected_regions, selected_state):
                         if res_key in st.session_state and not st.session_state[res_key].empty:
                             st.session_state[key] = int(st.session_state[res_key].iloc[0][param])
                         else:
-                            st.session_state[key] = sarimax_param_grid[param][1]
+                            st.session_state[key] = sarimax_param_grid[param][0]
         else:
             tuning_results_key = f"{model_prefix}_tuning_results"
             if tuning_results_key in st.session_state and not st.session_state[tuning_results_key].empty:
@@ -292,7 +290,7 @@ def sarimax_view(data, selected_regions, selected_state):
                 for param_name in sarimax_tuning_features:
                     key = f"selected_{model_prefix}_{param_name}"
                     if key not in st.session_state:
-                        st.session_state[key] = sarimax_param_grid[param_name][1]
+                        st.session_state[key] = sarimax_param_grid[param_name][0]
 
     st.header("SARIMAX Forecasting Model")
 

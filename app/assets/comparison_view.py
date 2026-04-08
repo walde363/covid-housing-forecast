@@ -3,6 +3,41 @@ import pandas as pd
 import plotly.express as px
 from fpdf import FPDF
 import datetime
+from google import genai
+
+def get_ai_summary(data_table_md, level_name):
+    """Invokes Gemini to analyze the metrics table."""
+    try:
+        if "GEMINI_API_KEY" not in st.secrets:
+            return "⚠️ Gemini API Key not found in secrets. Please add it to continue."
+    except Exception:
+        return "⚠️ Streamlit secrets file not found. Please create .streamlit/secrets.toml."
+
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    
+    prompt = f"""
+    You are a Senior Real Estate Data Scientist. Analyze the following model performance table for housing price forecasts at the {level_name} level.
+    
+    Performance Data (Markdown):
+    {data_table_md}
+    
+    Your task:
+    1. Identify the 'Winner' model(s) based on RMSE and MASE.
+    2. Compare the advanced models (XGBoost, RF, Prophet, SARIMAX) against the 'Seasonal Naive' baseline. 
+    3. Note if any model has a MASE > 1 (meaning it is worse than the baseline).
+    4. Provide a brief (3-4 sentences) executive summary of which model is safest for investment decisions.
+    
+    Keep the tone professional, data-driven, and concise.
+    """
+    
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return response.text
+    except Exception as e:
+        return f"❌ Error generating AI summary: {str(e)}"
 
 def generate_pdf_report(all_results):
     """Generates a comprehensive PDF report covering US, State, and Region levels."""
@@ -131,6 +166,16 @@ def render_comparison(all_results):
     st.subheader("📊 Metrics Summary Table")
     
     pivot_df = df.pivot(index="Model", columns="Metric", values="Value")
+
+    # AI Analysis Section
+    st.divider()
+    st.subheader("✨ AI Insights")
+    if st.button("🚀 Generate AI Summary", help="Uses Gemini to analyze the current comparison table"):
+        with st.spinner("Analyzing performance data..."):
+            # Convert table to markdown for the LLM
+            table_md = pivot_df.to_markdown()
+            analysis = get_ai_summary(table_md, comparison_level)
+            st.info(analysis)
 
     
     def highlight_best(s):

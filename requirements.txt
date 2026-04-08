@@ -16,3 +16,7 @@ kagglehub
 thefuzz
 streamlit
 fpdf2
+cuml
+cupy
+google-genai
+kaleido

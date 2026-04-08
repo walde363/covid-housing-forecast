@@ -7,9 +7,24 @@ from helpers.time_based_train_test_split import time_based_train_test_split
 from helpers.model_evaluator import evaluate_model
 from helpers.add_time_features import add_time_features
 
+_GPU_AVAILABLE = None
+
+def _check_gpu_available():
+    """Checks if a GPU is available for XGBoost and caches the result."""
+    global _GPU_AVAILABLE
+    if _GPU_AVAILABLE is None:
+        try:
+            # Attempt a tiny fit on GPU to verify CUDA support
+            XGBRegressor(device="cuda").fit(np.array([[0]]), np.array([0]))
+            _GPU_AVAILABLE = True
+        except Exception:
+            _GPU_AVAILABLE = False
+    return _GPU_AVAILABLE
 
 def train_xgboost(X_train, y_train, X_test, params):
-    model = XGBRegressor(**params)
+    xgb_params = params.copy()
+    xgb_params["device"] = "cuda" if _check_gpu_available() else "cpu"
+    model = XGBRegressor(**xgb_params)
     model.fit(X_train, y_train)
     predictions = model.predict(X_test)
     return model, predictions
@@ -19,7 +34,9 @@ def fit_xgboost_full(df_model, target_col, params):
     X_full = df_model.drop(columns=[target_col, "date"], errors="ignore").copy()
     y_full = df_model[target_col].copy()
 
-    model = XGBRegressor(**params)
+    xgb_params = params.copy()
+    xgb_params["device"] = "cuda" if _check_gpu_available() else "cpu"
+    model = XGBRegressor(**xgb_params)
     model.fit(X_full, y_full)
 
     return model, X_full, y_full

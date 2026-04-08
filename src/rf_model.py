@@ -7,9 +7,31 @@ from helpers.time_based_train_test_split import time_based_train_test_split
 from helpers.model_evaluator import evaluate_model
 from helpers.add_time_features import add_time_features
 
+_GPU_AVAILABLE = None
+
+def _check_gpu_available():
+    """Checks if cuML is available for Random Forest and caches the result."""
+    global _GPU_AVAILABLE
+    if _GPU_AVAILABLE is None:
+        try:
+            from cuml.ensemble import RandomForestRegressor as cuRF
+            # Attempt a tiny fit to verify CUDA/cuML support
+            cuRF().fit(np.array([[0]], dtype=np.float32), np.array([0], dtype=np.float32))
+            _GPU_AVAILABLE = True
+        except Exception:
+            _GPU_AVAILABLE = False
+    return _GPU_AVAILABLE
+
 
 def train_random_forest(X_train, y_train, X_test, params):
-    model = RandomForestRegressor(**params)
+    if _check_gpu_available():
+        from cuml.ensemble import RandomForestRegressor as cuRF
+        rf_params = params.copy()
+        rf_params.pop("n_jobs", None)  # cuML does not use n_jobs
+        model = cuRF(**rf_params)
+    else:
+        model = RandomForestRegressor(**params)
+
     model.fit(X_train, y_train)
     predictions = model.predict(X_test)
     return model, predictions

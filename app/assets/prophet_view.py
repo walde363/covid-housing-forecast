@@ -85,9 +85,9 @@ prophet_tuning_features = [
 
 prophet_param_grid = {
     "seasonality_mode": ["additive", "multiplicative"],
-    "changepoint_prior_scale": [0.05, 0.1, 0.5],
-    "seasonality_prior_scale": [10.0, 1.0, 0.1],
-    "yearly_seasonality": [True, False]
+    "changepoint_prior_scale": [0.05, 0.5],
+    "seasonality_prior_scale": [1.0, 10.0],
+    "yearly_seasonality": [True]
 }
 
 
@@ -95,10 +95,10 @@ prophet_param_grid = {
 def get_prophet_params(prefix, region=None):
     suffix = f"_{region}" if region else ""
     return {
-        "seasonality_mode": st.session_state[f"selected_{prefix}{suffix}_seasonality_mode"],
-        "changepoint_prior_scale": st.session_state[f"selected_{prefix}{suffix}_changepoint_prior_scale"],
-        "seasonality_prior_scale": st.session_state[f"selected_{prefix}{suffix}_seasonality_prior_scale"],
-        "yearly_seasonality": st.session_state[f"selected_{prefix}{suffix}_yearly_seasonality"],
+        "seasonality_mode": str(st.session_state[f"selected_{prefix}{suffix}_seasonality_mode"]),
+        "changepoint_prior_scale": float(st.session_state[f"selected_{prefix}{suffix}_changepoint_prior_scale"]),
+        "seasonality_prior_scale": float(st.session_state[f"selected_{prefix}{suffix}_seasonality_prior_scale"]),
+        "yearly_seasonality": bool(st.session_state[f"selected_{prefix}{suffix}_yearly_seasonality"]),
         "weekly_seasonality": False,
         "daily_seasonality": False
     }
@@ -147,8 +147,6 @@ def build_plot(result, plot_label):
         yaxis_title="Price",
         hovermode="x unified",
         template="plotly_dark",
-        paper_bgcolor="#1E293B",
-        plot_bgcolor="#1E293B",
         height=700,
         font=dict(color="#F8FAFC"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -230,7 +228,10 @@ def prophet_view(data, selected_regions, selected_state):
                     key = f"selected_{model_prefix}_{region}_{param}"
                     if key not in st.session_state:
                         if res_key in st.session_state and not st.session_state[res_key].empty:
-                            st.session_state[key] = st.session_state[res_key].iloc[0][param]
+                            val = st.session_state[res_key].iloc[0][param]
+                            if param == "yearly_seasonality":
+                                val = bool(val)
+                            st.session_state[key] = val
                         else:
                             st.session_state[key] = prophet_param_grid[param][0]
         else:
@@ -238,7 +239,10 @@ def prophet_view(data, selected_regions, selected_state):
             if tuning_results_key in st.session_state and not st.session_state[tuning_results_key].empty:
                 best_params = st.session_state[tuning_results_key].iloc[0]
                 for param_name in prophet_tuning_features:
-                    st.session_state[f"selected_{model_prefix}_{param_name}"] = best_params[param_name]
+                    val = best_params[param_name]
+                    if param_name == "yearly_seasonality":
+                        val = bool(val)
+                    st.session_state[f"selected_{model_prefix}_{param_name}"] = val
             else:
                 for a in prophet_tuning_features:
                     key = f"selected_{model_prefix}_{a}"

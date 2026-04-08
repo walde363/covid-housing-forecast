@@ -62,7 +62,8 @@ def build_snaive_plot(result, plot_label):
         xaxis_title="Date",
         yaxis_title="Price",
         template="plotly_dark",
-        height=600,
+        hovermode="x unified",
+        height=700,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     st.plotly_chart(fig, width='stretch')

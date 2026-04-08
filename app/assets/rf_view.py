@@ -99,25 +99,26 @@ rf_tuning_features = [
 ]
 
 defaults = {
-    "n_estimators": [300, 100, 500],
-    "max_depth": [10, 15, 20, None],
-    "min_samples_split": [5, 2, 10],
-    "min_samples_leaf": [2, 1, 4],
-    "max_features": ["sqrt", "log2"],
-    "bootstrap": [True, False]
+    "n_estimators": [100, 300],
+    "max_depth": [10, 20],
+    "min_samples_split": [2, 5],
+    "min_samples_leaf": [1, 2],
+    "max_features": ["sqrt"],
+    "bootstrap": [True]
 }
 
 
 
 def get_rf_params(prefix, region=None):
     suffix = f"_{region}" if region else ""
+    md = st.session_state[f"selected_{prefix}{suffix}_max_depth"]
     return {
-        "n_estimators": st.session_state[f"selected_{prefix}{suffix}_n_estimators"],
-        "max_depth": st.session_state[f"selected_{prefix}{suffix}_max_depth"],
-        "min_samples_split": st.session_state[f"selected_{prefix}{suffix}_min_samples_split"],
-        "min_samples_leaf": st.session_state[f"selected_{prefix}{suffix}_min_samples_leaf"],
+        "n_estimators": int(st.session_state[f"selected_{prefix}{suffix}_n_estimators"]),
+        "max_depth": int(md) if (md is not None and not pd.isna(md)) else None,
+        "min_samples_split": int(st.session_state[f"selected_{prefix}{suffix}_min_samples_split"]),
+        "min_samples_leaf": int(st.session_state[f"selected_{prefix}{suffix}_min_samples_leaf"]),
         "max_features": st.session_state[f"selected_{prefix}{suffix}_max_features"],
-        "bootstrap": st.session_state[f"selected_{prefix}{suffix}_bootstrap"],
+        "bootstrap": bool(st.session_state[f"selected_{prefix}{suffix}_bootstrap"]),
         "random_state": 42,
         "n_jobs": -1
     }
@@ -166,8 +167,6 @@ def build_plot(result, plot_label):
         yaxis_title="Price",
         hovermode="x unified",
         template="plotly_dark",
-        paper_bgcolor="#1E293B",
-        plot_bgcolor="#1E293B",
         height=700,
         font=dict(color="#F8FAFC"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -261,6 +260,9 @@ def rf_view(data, selected_regions, selected_state):
                     if key not in st.session_state:
                         if res_key in st.session_state and not st.session_state[res_key].empty:
                             val = st.session_state[res_key].iloc[0][param]
+                            if param in ["n_estimators", "max_depth", "min_samples_split", "min_samples_leaf"]:
+                                if not pd.isna(val):
+                                    val = int(val)
                             st.session_state[key] = None if pd.isna(val) else val
                         else:
                             st.session_state[key] = defaults[param][0]
@@ -270,6 +272,9 @@ def rf_view(data, selected_regions, selected_state):
                 best_params = st.session_state[tuning_results_key].iloc[0]
                 for param_name in rf_tuning_features:
                     val = best_params[param_name]
+                    if param_name in ["n_estimators", "max_depth", "min_samples_split", "min_samples_leaf"]:
+                        if not pd.isna(val):
+                            val = int(val)
                     st.session_state[f"selected_{model_prefix}_{param_name}"] = None if pd.isna(val) else val
             else:
                 for a in rf_tuning_features:

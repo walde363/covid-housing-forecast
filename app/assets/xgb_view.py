@@ -1,3 +1,4 @@
+import itertools
 import sys
 from pathlib import Path
 
@@ -5,6 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[0]
 sys.path.append(str(PROJECT_ROOT))
 
 from metrics_display import metrics_display
+import pandas as pd
 
 import streamlit as st
 import plotly.graph_objects as go
@@ -111,16 +113,17 @@ xgb_param_grid = {
 }
 
 
-def get_xgb_params(prefix):
+def get_xgb_params(prefix, region=None):
+    suffix = f"_{region}" if region else ""
     return {
-        "n_estimators": st.session_state[f"selected_{prefix}_n_estimators"],
-        "learning_rate": st.session_state[f"selected_{prefix}_learning_rate"],
-        "max_depth": st.session_state[f"selected_{prefix}_max_depth"],
-        "min_child_weight": st.session_state[f"selected_{prefix}_min_child_weight"],
-        "subsample": st.session_state[f"selected_{prefix}_subsample"],
-        "colsample_bytree": st.session_state[f"selected_{prefix}_colsample_bytree"],
+        "n_estimators": st.session_state[f"selected_{prefix}{suffix}_n_estimators"],
+        "learning_rate": st.session_state[f"selected_{prefix}{suffix}_learning_rate"],
+        "max_depth": st.session_state[f"selected_{prefix}{suffix}_max_depth"],
+        "min_child_weight": st.session_state[f"selected_{prefix}{suffix}_min_child_weight"],
+        "subsample": st.session_state[f"selected_{prefix}{suffix}_subsample"],
+        "colsample_bytree": st.session_state[f"selected_{prefix}{suffix}_colsample_bytree"],
         "random_state": 42,
-        "n_jobs": 1
+        "n_jobs": -1
     }
 
 def build_plot(result, plot_label):
@@ -176,38 +179,104 @@ def build_plot(result, plot_label):
 
     st.plotly_chart(fig, width='stretch')
 
+def run_tuning(model_prefix, data, target_col, selected_features, level, region=None, state=None, rerun=True):
+    param_names = xgb_tuning_features
+    combinations = list(itertools.product(*[xgb_param_grid[k] for k in param_names]))
+    
+    results_list = []
+    progress_text = f"Tuning {model_prefix.replace('_', ' ')}..."
+    my_bar = st.progress(0, text=progress_text)
+    
+    for i, combo in enumerate(combinations):
+        my_bar.progress((i + 1) / len(combinations), text=f"{progress_text} ({i+1}/{len(combinations)})")
+        params = dict(zip(param_names, combo))
+        params.update({"random_state": 42, "n_jobs": -1})
+        
+        try:
+            if model_prefix == "ust_xgb":
+                res = xgb_panel_pipeline(
+                    target_col=target_col,
+                    dataset=data,
+                    selected_cols=selected_features,
+                    selected_region=region,
+                    test_periods=12,
+                    params=params
+                )
+            else:
+                res = xgb_model_pipeline(
+                    target_col=target_col,
+                    dataset=data,
+                    selected_cols=selected_features,
+                    level=level,
+                    region=region,
+                    state=state,
+                    test_periods=12,
+                    params=params
+                )
+            rmse = next(m["Value"] for m in res["eval_results"] if m["Metric"] == "RMSE")
+            results_list.append({**params, "RMSE": rmse})
+        except Exception:
+            continue
+            
+    if results_list:
+        df = pd.DataFrame(results_list).sort_values("RMSE")
+        res_key = f"{model_prefix}_{region}_tuning_results" if region else f"{model_prefix}_tuning_results"
+        st.session_state[res_key] = df
+        if rerun:
+            st.rerun()
 
-def models_cols(results, plot_label, model):
+
+def render_tuning_ui(model, data, selected_features, level, region=None, state=None):
+    st.subheader(f"⚙️ Tuning: {region if region else level}")
+    suffix = f"_{region}" if region else ""
+    paramcol1, paramcol2 = st.columns(2)
+    for param in xgb_tuning_features[:3]:
+        paramcol1.selectbox(
+                f"{param}",
+                options=list(xgb_param_grid[param]),
+                key=f"selected_{model}{suffix}_{param}"
+            )
+    for param in xgb_tuning_features[3:]:
+        paramcol2.selectbox(
+                f"{param}",
+                options=list(xgb_param_grid[param]),
+                key=f"selected_{model}{suffix}_{param}"
+            )
+    
+    if st.button(f"🚀 Auto-Tune based on {region if region else level}", key=f"tune_btn_{model}_{region}", width='stretch'):
+        run_tuning(model, data, "median_listing_price_x", selected_features, level, region, state)
+
+def models_cols(results, plot_label):
     col1, col2 = st.columns([3, 1])
-
     with col1:
         build_plot(results, plot_label)
-
     with col2:
-        st.header("Model Tuning")
-        paramcol1, paramcol2 = st.columns(2)
-        for param in xgb_tuning_features[:3]:
-            paramcol1.selectbox(
-                    f"{param}",
-                    options=list(xgb_param_grid[param]),
-                    key=f"selected_{model}_{param}"
-                )
-        for param in xgb_tuning_features[3:]:
-            paramcol2.selectbox(
-                    f"{param}",
-                    options=list(xgb_param_grid[param]),
-                    key=f"selected_{model}_{param}"
-                )
-        st.divider()
         metrics_display(results["eval_results"])
 
 
-def xgb_view(data, selected_region, selected_state):
-    for i in model_vars:
-        for a in xgb_tuning_features:
-            key = f"selected_{i}_{a}"
-            if key not in st.session_state:
-                st.session_state[key] = xgb_param_grid[a][0]
+def xgb_view(data, selected_regions, selected_state):
+    for model_prefix in model_vars:
+        if model_prefix in ["rg_xgb", "ust_xgb"]:
+            for region in selected_regions:
+                res_key = f"{model_prefix}_{region}_tuning_results"
+                for param in xgb_tuning_features:
+                    key = f"selected_{model_prefix}_{region}_{param}"
+                    if key not in st.session_state:
+                        if res_key in st.session_state and not st.session_state[res_key].empty:
+                            st.session_state[key] = st.session_state[res_key].iloc[0][param]
+                        else:
+                            st.session_state[key] = xgb_param_grid[param][0]
+        else:
+            tuning_results_key = f"{model_prefix}_tuning_results"
+            if tuning_results_key in st.session_state and not st.session_state[tuning_results_key].empty:
+                best_params = st.session_state[tuning_results_key].iloc[0]
+                for param_name in xgb_tuning_features:
+                    st.session_state[f"selected_{model_prefix}_{param_name}"] = best_params[param_name]
+            else:
+                for a in xgb_tuning_features:
+                    key = f"selected_{model_prefix}_{a}"
+                    if key not in st.session_state:
+                        st.session_state[key] = xgb_param_grid[a][0]
 
     st.header("XGBoost Regressor Model")
     
@@ -261,52 +330,101 @@ def xgb_view(data, selected_region, selected_state):
     ])
 
     with tab1:
-        with st.spinner("Loading model...", show_time=True):
-            result_region = xgb_model_pipeline(
-                target_col="median_listing_price_x",
-                dataset=data,
-                selected_cols=selected_features,
-                level="region",
-                region=selected_region,
-                test_periods=12,
-                params=get_xgb_params("rg_xgb")
-            )
-        models_cols(result_region, selected_region, "rg_xgb")
+        result_region_dict = {}
+        for region in selected_regions:
+            params_rg = get_xgb_params("rg_xgb", region=region)
+            cache_key_rg = f"cache_xgb_rg_{region}_{str(params_rg)}"
+            if cache_key_rg not in st.session_state:
+                with st.spinner(f"Loading {region} model...", show_time=True):
+                    st.session_state[cache_key_rg] = xgb_model_pipeline(
+                        target_col="median_listing_price_x",
+                        dataset=data,
+                        selected_cols=selected_features,
+                        level="region",
+                        region=region,
+                        test_periods=12,
+                        params=params_rg
+                    )
+            res_rg = st.session_state[cache_key_rg]
+            result_region_dict[region] = res_rg["eval_results"]
+            with st.expander(f"📍 Region Model: {region}", expanded=True):
+                render_tuning_ui("rg_xgb", data, selected_features, "region", region=region)
+                st.divider()
+                models_cols(res_rg, region)
 
     with tab2:
-        with st.spinner("Loading model...", show_time=True):
-            result_state = xgb_model_pipeline(
-                target_col="median_listing_price_x",
-                dataset=data,
-                selected_cols=selected_features,
-                level="state",
-                state=selected_state,
-                test_periods=12,
-                params=get_xgb_params("state_xgb")
-            )
-        models_cols(result_state, selected_state.upper(), "state_xgb")
+        params_st = get_xgb_params("state_xgb")
+        cache_key_st = f"cache_xgb_st_{selected_state}_{str(params_st)}"
+        if cache_key_st not in st.session_state:
+            with st.spinner("Loading model...", show_time=True):
+                st.session_state[cache_key_st] = xgb_model_pipeline(
+                    target_col="median_listing_price_x",
+                    dataset=data,
+                    selected_cols=selected_features,
+                    level="state",
+                    state=selected_state,
+                    test_periods=12,
+                    params=params_st
+                )
+        result_state = st.session_state[cache_key_st]
+
+        render_tuning_ui("state_xgb", data, selected_features, "state", state=selected_state)
+        st.divider()
+        models_cols(result_state, selected_state.upper())
 
     with tab3:
-        with st.spinner("Loading model...", show_time=True):
-            result_us = xgb_model_pipeline(
-                target_col="median_listing_price_x",
-                dataset=data,
-                selected_cols=selected_features,
-                level="us",
-                test_periods=12,
-                params=get_xgb_params("aggr_xgb")
-            )
-        models_cols(result_us, "Entire US", "aggr_xgb")
+        params_us = get_xgb_params("aggr_xgb")
+        cache_key_us = f"cache_xgb_us_{str(params_us)}"
+        if cache_key_us not in st.session_state:
+            with st.spinner("Loading model...", show_time=True):
+                st.session_state[cache_key_us] = xgb_model_pipeline(
+                    target_col="median_listing_price_x",
+                    dataset=data,
+                    selected_cols=selected_features,
+                    level="us",
+                    test_periods=12,
+                    params=params_us
+                )
+        result_us = st.session_state[cache_key_us]
+
+        render_tuning_ui("aggr_xgb", data, selected_features, "us")
+        st.divider()
+        models_cols(result_us, "Entire US")
 
     with tab4:
-        with st.spinner("Loading model...", show_time=True):
-            rf_result = xgb_panel_pipeline(
-                target_col="median_listing_price_x",
-                dataset=data,
-                selected_cols=panel_features,
-                selected_region=selected_region,
-                test_periods=12,
-                params=get_xgb_params("ust_xgb")
-            )
-        models_cols(rf_result, f"US Train → {selected_region}", "ust_xgb")
+        result_ust_dict = {}
+        for region in selected_regions:
+            params_ust = get_xgb_params("ust_xgb", region=region)
+            cache_key_ust = f"cache_xgb_ust_{region}_{str(params_ust)}"
+            if cache_key_ust not in st.session_state:
+                with st.spinner(f"Loading {region} Panel model...", show_time=True):
+                    st.session_state[cache_key_ust] = xgb_panel_pipeline(
+                        target_col="median_listing_price_x",
+                        dataset=data,
+                        selected_cols=panel_features,
+                        selected_region=region,
+                        test_periods=12,
+                        params=params_ust
+                    )
+            res_ust = st.session_state[cache_key_ust]
+            result_ust_dict[region] = res_ust["eval_results"]
+            with st.expander(f"🌐 US Train → Region: {region}", expanded=True):
+                render_tuning_ui("ust_xgb", data, panel_features, "region", region=region)
+                st.divider()
+                models_cols(res_ust, f"US Train → {region}")
+
+    st.divider()
+    st.header("📊 XGB Tuning Results")
+    for m_var in model_vars:
+        res_key = f"{m_var}_tuning_results"
+        if res_key in st.session_state:
+            with st.expander(f"Tuning History: {m_var.replace('_', ' ').title()}", expanded=True):
+                st.dataframe(st.session_state[res_key], width='stretch')
+
+    return {
+        "region": result_region_dict,
+        "panel": result_ust_dict,
+        "state": result_state["eval_results"],
+        "us": result_us["eval_results"]
+    }
         

@@ -4,6 +4,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[0]
 sys.path.append(str(PROJECT_ROOT))
 
+import pandas as pd
 from metrics_display import metrics_display
 
 import streamlit as st
@@ -37,7 +38,43 @@ MODEL_OVERVIEW_MD_SNAIVE_2 = """
 - Not suitable for complex or changing dynamics
 """
 
-def render_seasonal_naive(filtered_data, selected_region):
+def build_snaive_plot(result, plot_label):
+    train = result["train"]
+    test = result["test"]
+    forecast = result["forecast"]
+    future_forecast = result["future_forecast"]
+    future_forecast_dates = result["future_forecast_dates"]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=train.index, y=train.values, mode="lines", name="Train"))
+    fig.add_trace(go.Scatter(x=test.index, y=test.values, mode="lines+markers", name="Actual"))
+    fig.add_trace(go.Scatter(x=test.index, y=forecast, mode="lines+markers", name="Predicted"))
+    fig.add_trace(go.Scatter(
+        x=future_forecast_dates,
+        y=future_forecast,
+        mode="lines+markers",
+        line=dict(dash='dot'),
+        name="18-Month Forward Forecast"
+    ))
+
+    fig.update_layout(
+        title=f"Actual vs Predicted ({plot_label})",
+        xaxis_title="Date",
+        yaxis_title="Price",
+        template="plotly_dark",
+        height=600,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig, width='stretch')
+
+def snaive_cols(result, plot_label):
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        build_snaive_plot(result, plot_label)
+    with col2:
+        metrics_display(result["eval_results"])
+
+def render_seasonal_naive(data, selected_regions, selected_state):
     with st.container():
         st.header("Seasonal Naive Model")
         
@@ -48,70 +85,65 @@ def render_seasonal_naive(filtered_data, selected_region):
             with col2:
                 st.markdown(MODEL_OVERVIEW_MD_SNAIVE_2)
 
-        result = seasonal_naive_model(
-            filtered_data,
-            "median_listing_price_x",
-            "county_name_x",
-            selected_region,
-            12
-        )
+        tab1, tab2, tab3 = st.tabs([
+            "Region Model",
+            "State Aggregate",
+            "US Aggregate"
+        ])
 
-        train = result["train"]
-        test = result["test"]
-        forecast = result["forecast"]
-        future_forecast = result["future_forecast"]
-        future_forecast_dates = result["future_forecast_dates"]
-    
-        col1, col2 = st.columns([3, 1])
+        target_col = "median_listing_price_x"
 
-        with col1:
-            fig = go.Figure()
+        with tab1:
+            all_region_results = {}
+            for region in selected_regions:
+                with st.expander(f"📍 Region Model: {region}", expanded=True):
+                    cache_key = f"cache_snaive_rg_{region}"
+                    if cache_key not in st.session_state:
+                        st.session_state[cache_key] = seasonal_naive_model(
+                            data,
+                            target_col,
+                            "county_name_x",
+                            region,
+                            12
+                        )
+                    
+                    result = st.session_state[cache_key]
+                    all_region_results[region] = result["eval_results"]
+                    snaive_cols(result, region)
 
-            fig.add_trace(go.Scatter(
-                x=train.index,
-                y=train.values,
-                mode="lines",
-                name="Train"
-            ))
+        with tab2:
+            cache_key_st = f"cache_snaive_st_{selected_state}"
+            if cache_key_st not in st.session_state:
+                state_data = data[data["state"] == selected_state].groupby("date")[target_col].mean().reset_index()
+                state_data["level"] = "state"
+                st.session_state[cache_key_st] = seasonal_naive_model(
+                    state_data,
+                    target_col,
+                    "level",
+                    "state",
+                    12
+                )
+            result_state = st.session_state[cache_key_st]
+            snaive_cols(result_state, selected_state.upper())
 
-            fig.add_trace(go.Scatter(
-                x=test.index,
-                y=test.values,
-                mode="lines+markers",
-                name="Actual"
-            ))
+        with tab3:
+            cache_key_us = "cache_snaive_us"
+            if cache_key_us not in st.session_state:
+                us_data = data.groupby("date")[target_col].mean().reset_index()
+                us_data["level"] = "us"
+                st.session_state[cache_key_us] = seasonal_naive_model(
+                    us_data,
+                    target_col,
+                    "level",
+                    "us",
+                    12
+                )
+            result_us = st.session_state[cache_key_us]
+            snaive_cols(result_us, "Entire US")
 
-            fig.add_trace(go.Scatter(
-                x=test.index,
-                y=forecast,
-                mode="lines+markers",
-                name="Predicted"
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=future_forecast_dates,
-                y=future_forecast,
-                mode="lines+markers",
-                line=dict(dash='dot'),
-                name="18-Month Forward Forecast"
-            ))
-
-            fig.update_layout(
-                title=f"Median Listing Price: Actual vs Predicted ({selected_region})",
-                xaxis_title="Date",
-                yaxis_title="Price",
-                hovermode="x unified",
-                template="plotly_dark",
-                paper_bgcolor="#1E293B",
-                plot_bgcolor="#1E293B",
-                height=700,
-                font=dict(color="#F8FAFC"),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
-            
-
-            st.plotly_chart(fig, width='stretch')
-
-        with col2:
-            metrics_display(result["eval_results"])
+        return {
+            "region": all_region_results,
+            "state": result_state["eval_results"],
+            "us": result_us["eval_results"]
+        }
                     

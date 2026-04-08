@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from xgboost import XGBRegressor
 
@@ -40,32 +41,22 @@ def recursive_xgb_forecast(
     history["date"] = pd.to_datetime(history["date"])
     history = history.sort_values("date").reset_index(drop=True)
 
-    base_cols = history.columns.tolist()
-    carry_forward_cols = [col for col in base_cols if col not in ["date", target_col]]
-
     future_predictions = []
 
     for _ in range(steps):
         last_date = history["date"].max()
         next_date = last_date + pd.offsets.MonthBegin(1)
 
-        new_row = {col: None for col in base_cols}
+        # Copy the last row to maintain dtypes and exogenous values, then update date
+        new_row = history.iloc[[-1]].copy()
         new_row["date"] = next_date
+        new_row[target_col] = np.nan
 
-        history = pd.concat([history, pd.DataFrame([new_row])], ignore_index=True)
-
-        # carry forward known exogenous/static columns
-        for col in carry_forward_cols:
-            history.loc[history.index[-1], col] = history.loc[history.index[-2], col]
+        history = pd.concat([history, new_row], ignore_index=True)
 
         history = add_time_features(history, target_col=target_col)
 
         next_row_features = history.iloc[[-1]][feature_cols].copy()
-
-        # force same dtypes as training data
-        for col in feature_cols:
-            if str(feature_dtypes[col]) in ["int64", "int32", "float64", "float32", "bool"]:
-                next_row_features[col] = pd.to_numeric(next_row_features[col], errors="coerce")
 
         next_row_features = next_row_features.astype(feature_dtypes)
 

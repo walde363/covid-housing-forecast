@@ -9,10 +9,11 @@ import pandas as pd
 
 from assets.map import state_map
 from assets.seasonal_naive_view import render_seasonal_naive
-from assets.sarimax_view import sarimax_view
-from assets.rf_view import rf_view
-from assets.xgb_view import xgb_view
-from assets.prophet_view import prophet_view
+from assets.sarimax_view import sarimax_view, run_tuning as run_sarimax_tuning
+from assets.rf_view import rf_view, run_tuning as run_rf_tuning
+from assets.xgb_view import xgb_view, run_tuning as run_xgb_tuning
+from assets.prophet_view import prophet_view, run_tuning as run_prophet_tuning
+from assets.comparison_view import render_comparison
 # from assets.choropleth_map import render_choropleth
 import time
 
@@ -155,9 +156,6 @@ month_options = sorted(
 if st.session_state.selected_month not in month_options:
     st.session_state.selected_month = month_options[0]
 
-if st.session_state.selected_month not in month_options:
-    st.session_state.selected_month = month_options[0]
-
 # create filtered_data BEFORE summaries
 selected_state = st.session_state.selected_state
 filtered_data = data[data["state"] == selected_state].copy()
@@ -196,14 +194,6 @@ with col2:
             key="selected_month"
         )
 
-    state_summary = get_market_summary(
-        data[
-            (data["state"] == st.session_state.selected_state) &
-            (data["year"] == st.session_state.selected_year) & 
-            (data["month"] == st.session_state.selected_month)
-        ].copy()
-    )
-
     us_summary = get_market_summary(
         data[(data["year"] == st.session_state.selected_year) & 
             (data["month"] == st.session_state.selected_month)].copy()
@@ -237,10 +227,39 @@ with col2:
             st.metric("Pending Ratio", f"{us_summary['pending_ratio']:.2f}")
             st.metric("Days on Market", f"{us_summary['days_on_market']:.1f}")
 
-selected_state = st.session_state.selected_state
-filtered_data = data[data["state"] == selected_state].copy()
-
-st.write("Selected state:", selected_state)
+    st.divider()
+    st.sidebar.header("⚙️ Global Actions")
+    if st.sidebar.button("🚀 Auto-Tune All Models", width='stretch', help="Warning: This will take a long time to complete."):
+        target = "median_listing_price_x"
+        std_feats = ["median_listing_price_x"]
+        ml_feats = ["median_listing_price_x", "active_listing_count", "new_listing_count", "pending_ratio", "price_reduced_share", "Unemployment_Rate", "Earnings"]
+        pnl_feats = ["active_listing_count", "new_listing_count", "pending_ratio", "price_reduced_share", "Unemployment_Rate", "Earnings", "Investor Purchases", "Investor Market Share"]
+        
+        # Tune for the first selected region to keep it efficient
+        if st.session_state.regions:
+            primary_region = st.session_state.regions[0]
+            
+            # SARIMAX
+            run_sarimax_tuning("rg_sarimax", data, target, std_feats, "region", region=primary_region, rerun=False)
+            run_sarimax_tuning("state_sarimax", data, target, std_feats, "state", state=selected_state, rerun=False)
+            run_sarimax_tuning("aggr_sarimax", data, target, std_feats, "us", rerun=False)
+            
+            # Prophet
+            run_prophet_tuning("rg_prophet", data, target, std_feats, "region", region=primary_region, rerun=False)
+            run_prophet_tuning("state_prophet", data, target, std_feats, "state", state=selected_state, rerun=False)
+            run_prophet_tuning("aggr_prophet", data, target, std_feats, "us", rerun=False)
+            
+            # RF
+            run_rf_tuning("rg_rf", data, target, ml_feats, "region", region=primary_region, rerun=False)
+            run_rf_tuning("state_rf", data, target, ml_feats, "state", state=selected_state, rerun=False)
+            run_rf_tuning("aggr_rf", data, target, ml_feats, "us", rerun=False)
+            
+            # XGB
+            run_xgb_tuning("rg_xgb", data, target, ml_feats, "region", region=primary_region, rerun=False)
+            run_xgb_tuning("state_xgb", data, target, ml_feats, "state", state=selected_state, rerun=False)
+            run_xgb_tuning("aggr_xgb", data, target, ml_feats, "us", rerun=False)
+        
+        st.rerun()
 
 # render_choropleth(data, selected_state)
 
@@ -250,32 +269,38 @@ if not regions:
     st.warning("No regions found for the selected state.")
     st.stop()
 
-if "region" not in st.session_state or st.session_state.region not in regions:
-    st.session_state.region = regions[0]
-
-selected_region = st.selectbox(
-    "Select Region",
+selected_regions = st.multiselect(
+    "Select Region(s) to Analyze",
     regions,
-    key="region"
+    default=[regions[0]] if regions else [],
+    key="regions"
 )
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["Seasonal Naive", "SARIMAX", "Random Forest", "XGBoost", "TFT", "Prophet"]
+    ["Seasonal Naive", "SARIMAX", "Prophet", "Random Forest", "XGBoost", "Model Comparison"]
 )
 with tab1:
-    render_seasonal_naive(filtered_data, selected_region)
+    res_snaive = render_seasonal_naive(data, selected_regions, selected_state)
 
 with tab2:
-    sarimax_view(data, selected_region, selected_state)
-
+    res_sarimax = sarimax_view(data, selected_regions, selected_state)
+    
 with tab3:
-    rf_view(data, selected_region, selected_state)
+    res_prophet = prophet_view(data, selected_regions, selected_state)
 
 with tab4:
-    xgb_view(data, selected_region, selected_state)
+    res_rf = rf_view(data, selected_regions, selected_state)
 
 with tab5:
-    st.write("In progress")
+    res_xgb = xgb_view(data, selected_regions, selected_state)
 
 with tab6:
-    prophet_view(data, selected_region, selected_state)
+    render_comparison({
+        "Seasonal Naive": res_snaive,
+        "SARIMAX": res_sarimax,
+        "Prophet": res_prophet,
+        "Random Forest": {"region": res_rf["region"], "state": res_rf["state"], "us": res_rf["us"]},
+        "Random Forest (Panel)": {"region": res_rf.get("panel", {})},
+        "XGBoost": {"region": res_xgb["region"], "state": res_xgb["state"], "us": res_xgb["us"]},
+        "XGBoost (Panel)": {"region": res_xgb.get("panel", {})}
+    })

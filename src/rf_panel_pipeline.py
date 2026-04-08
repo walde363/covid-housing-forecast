@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 
@@ -36,25 +37,18 @@ def recursive_panel_rf_forecast(
     if history.empty:
         raise ValueError(f"No history found for selected_region='{selected_region}'")
 
-    base_cols = history.columns.tolist()
-    carry_forward_cols = [col for col in base_cols if col not in ["date", target_col]]
-
     future_predictions = []
 
     for _ in range(steps):
         last_date = history["date"].max()
         next_date = last_date + pd.offsets.MonthBegin(1)
 
-        new_row = {col: pd.NA for col in base_cols}
+        # Copy the last row to maintain dtypes and exogenous values, then update date
+        new_row = history.iloc[[-1]].copy()
         new_row["date"] = next_date
-        new_row[region_col] = region_key
+        new_row[target_col] = np.nan
 
-        history = pd.concat([history, pd.DataFrame([new_row])], ignore_index=True)
-
-        # carry forward known exogenous/static columns
-        for col in carry_forward_cols:
-            if col != region_col:
-                history.loc[history.index[-1], col] = history.loc[history.index[-2], col]
+        history = pd.concat([history, new_row], ignore_index=True)
 
         history = add_time_features(history, target_col=target_col)
 

@@ -1,3 +1,4 @@
+import itertools
 import sys
 from pathlib import Path
 
@@ -5,6 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[0]
 sys.path.append(str(PROJECT_ROOT))
 
 from metrics_display import metrics_display
+import pandas as pd
 
 import streamlit as st
 import plotly.graph_objects as go
@@ -91,17 +93,18 @@ sarimax_param_grid = {
 }
 
 
-def get_sarimax_params(prefix):
+def get_sarimax_params(prefix, region=None):
+    suffix = f"_{region}" if region else ""
     return {
         "order": (
-            st.session_state[f"selected_{prefix}_p"],
-            st.session_state[f"selected_{prefix}_d"],
-            st.session_state[f"selected_{prefix}_q"]
+            st.session_state[f"selected_{prefix}{suffix}_p"],
+            st.session_state[f"selected_{prefix}{suffix}_d"],
+            st.session_state[f"selected_{prefix}{suffix}_q"]
         ),
         "seasonal_order": (
-            st.session_state[f"selected_{prefix}_P"],
-            st.session_state[f"selected_{prefix}_D"],
-            st.session_state[f"selected_{prefix}_Q"],
+            st.session_state[f"selected_{prefix}{suffix}_P"],
+            st.session_state[f"selected_{prefix}{suffix}_D"],
+            st.session_state[f"selected_{prefix}{suffix}_Q"],
             12
         ),
         "enforce_stationarity": False,
@@ -168,66 +171,128 @@ def build_plot(result, plot_label):
 
     st.plotly_chart(fig, width="stretch")
 
+def run_tuning(model_prefix, data, target_col, selected_features, level, region=None, state=None, rerun=True):
+    param_names = ["p", "d", "q", "P", "D", "Q"]
+    combinations = list(itertools.product(*[sarimax_param_grid[k] for k in param_names]))
+    
+    results_list = []
+    
+    progress_text = f"Tuning {model_prefix.replace('_', ' ')}..."
+    my_bar = st.progress(0, text=progress_text)
+    
+    for i, combo in enumerate(combinations):
+        my_bar.progress((i + 1) / len(combinations), text=f"{progress_text} ({i+1}/{len(combinations)})")
+        params = {
+            "order": combo[:3],
+            "seasonal_order": (*combo[3:], 12),
+            "enforce_stationarity": False,
+            "enforce_invertibility": False
+        }
+        try:
+            res = sarimax_model_pipeline(
+                target_col=target_col,
+                dataset=data,
+                selected_cols=selected_features,
+                params=params,
+                level=level,
+                region=region,
+                state=state,
+                test_periods=12
+            )
+            rmse = next(m["Value"] for m in res["eval_results"] if m["Metric"] == "RMSE")
+            results_list.append({
+                "p": combo[0], "d": combo[1], "q": combo[2],
+                "P": combo[3], "D": combo[4], "Q": combo[5],
+                "RMSE": rmse
+            })
+        except Exception:
+            continue
+            
+    if results_list:
+        df = pd.DataFrame(results_list).sort_values("RMSE")
+        res_key = f"{model_prefix}_{region}_tuning_results" if region else f"{model_prefix}_tuning_results"
+        st.session_state[res_key] = df
+        if rerun:
+            st.rerun()
 
-def models_cols(results, plot_label, model):
+def render_tuning_ui(model, data, selected_features, level, region=None, state=None):
+    st.subheader(f"⚙️ Tuning: {region if region else level}")
+    suffix = f"_{region}" if region else ""
+
+    row1_col1, row1_col2, row1_col3 = st.columns(3)
+    with row1_col1:
+        st.selectbox(
+            "p value",
+            options=sarimax_param_grid["p"],
+            key=f"selected_{model}{suffix}_p"
+        )
+    with row1_col2:
+        st.selectbox(
+            "d value",
+            options=sarimax_param_grid["d"],
+            key=f"selected_{model}{suffix}_d"
+        )
+    with row1_col3:
+        st.selectbox(
+            "q value",
+            options=sarimax_param_grid["q"],
+            key=f"selected_{model}{suffix}_q"
+        )
+
+    row2_col1, row2_col2, row2_col3 = st.columns(3)
+    with row2_col1:
+        st.selectbox(
+            "P value",
+            options=sarimax_param_grid["P"],
+            key=f"selected_{model}{suffix}_P"
+        )
+    with row2_col2:
+        st.selectbox(
+            "D value",
+            options=sarimax_param_grid["D"],
+            key=f"selected_{model}{suffix}_D"
+        )
+    with row2_col3:
+        st.selectbox(
+            "Q value",
+            options=sarimax_param_grid["Q"],
+            key=f"selected_{model}{suffix}_Q"
+        )
+    
+    if st.button(f"🚀 Auto-Tune based on {region if region else level}", key=f"tune_btn_{model}{suffix}", width='stretch'):
+        run_tuning(model, data, "median_listing_price_x", selected_features, level, region, state)
+
+def models_cols(results, plot_label):
     col1, col2 = st.columns([3, 1])
-
     with col2:
-        st.header("Model Tuning")
-
-        row1_col1, row1_col2, row1_col3 = st.columns(3)
-        with row1_col1:
-            st.selectbox(
-                "p value",
-                options=sarimax_param_grid["p"],
-                key=f"selected_{model}_p"
-            )
-        with row1_col2:
-            st.selectbox(
-                "d value",
-                options=sarimax_param_grid["d"],
-                key=f"selected_{model}_d"
-            )
-        with row1_col3:
-            st.selectbox(
-                "q value",
-                options=sarimax_param_grid["q"],
-                key=f"selected_{model}_q"
-            )
-
-        row2_col1, row2_col2, row2_col3 = st.columns(3)
-        with row2_col1:
-            st.selectbox(
-                "P value",
-                options=sarimax_param_grid["P"],
-                key=f"selected_{model}_P"
-            )
-        with row2_col2:
-            st.selectbox(
-                "D value",
-                options=sarimax_param_grid["D"],
-                key=f"selected_{model}_D"
-            )
-        with row2_col3:
-            st.selectbox(
-                "Q value",
-                options=sarimax_param_grid["Q"],
-                key=f"selected_{model}_Q"
-            )
-
-        st.divider()
         metrics_display(results["eval_results"])
-
     with col1:
         build_plot(results, plot_label)
 
 
-def sarimax_view(data, selected_region, selected_state):
-    for model in model_vars:
-        for param in sarimax_tuning_features:
-            key = f"selected_{model}_{param}"
-            if key not in st.session_state:
-                st.session_state[key] = sarimax_param_grid[param][1]
+def sarimax_view(data, selected_regions, selected_state):
+    for model_prefix in model_vars:
+        if model_prefix == "rg_sarimax":
+            for region in selected_regions:
+                res_key = f"{model_prefix}_{region}_tuning_results"
+                for param in sarimax_tuning_features:
+                    key = f"selected_{model_prefix}_{region}_{param}"
+                    if key not in st.session_state:
+                        if res_key in st.session_state and not st.session_state[res_key].empty:
+                            st.session_state[key] = int(st.session_state[res_key].iloc[0][param])
+                        else:
+                            st.session_state[key] = sarimax_param_grid[param][1]
+        else:
+            tuning_results_key = f"{model_prefix}_tuning_results"
+            if tuning_results_key in st.session_state and not st.session_state[tuning_results_key].empty:
+                best_params = st.session_state[tuning_results_key].iloc[0]
+                for param_name in sarimax_tuning_features:
+                    st.session_state[f"selected_{model_prefix}_{param_name}"] = int(best_params[param_name])
+            else:
+                for param_name in sarimax_tuning_features:
+                    key = f"selected_{model_prefix}_{param_name}"
+                    if key not in st.session_state:
+                        st.session_state[key] = sarimax_param_grid[param_name][1]
 
     st.header("SARIMAX Forecasting Model")
 
@@ -261,40 +326,73 @@ def sarimax_view(data, selected_region, selected_state):
     selected_features = ["median_listing_price_x"]
 
     with tab1:
-        with st.spinner("Loading model...", show_time=True):
-            result_region = sarimax_model_pipeline(
-                target_col="median_listing_price_x",
-                dataset=data,
-                selected_cols=selected_features,
-                params=get_sarimax_params("rg_sarimax"),
-                level="region",
-                region=selected_region,
-                test_periods=12
-            )
-        models_cols(result_region, selected_region, "rg_sarimax")
+        result_region_dict = {}
+        for region in selected_regions:
+            params_rg = get_sarimax_params("rg_sarimax", region=region)
+            cache_key_rg = f"cache_sarimax_rg_{region}_{str(params_rg)}"
+            if cache_key_rg not in st.session_state:
+                with st.spinner(f"Loading {region} model...", show_time=True):
+                    st.session_state[cache_key_rg] = sarimax_model_pipeline(
+                        target_col="median_listing_price_x", dataset=data, selected_cols=selected_features,
+                        params=params_rg, level="region", region=region, test_periods=12
+                    )
+            res_rg = st.session_state[cache_key_rg]
+            result_region_dict[region] = res_rg["eval_results"]
+            with st.expander(f"📍 Region Model: {region}", expanded=True):
+                render_tuning_ui("rg_sarimax", data, selected_features, "region", region=region)
+                st.divider()
+                models_cols(res_rg, region)
 
     with tab2:
-        with st.spinner("Loading model...", show_time=True):
-            result_state = sarimax_model_pipeline(
-                target_col="median_listing_price_x",
-                dataset=data,
-                selected_cols=selected_features,
-                params=get_sarimax_params("state_sarimax"),
-                level="state",
-                state=selected_state,
-                test_periods=12
-            )
-        models_cols(result_state, selected_state.upper(), "state_sarimax")
+        params_st = get_sarimax_params("state_sarimax")
+        cache_key_st = f"cache_sarimax_st_{selected_state}_{str(params_st)}"
+        if cache_key_st not in st.session_state:
+            with st.spinner("Loading model...", show_time=True):
+                st.session_state[cache_key_st] = sarimax_model_pipeline(
+                    target_col="median_listing_price_x",
+                    dataset=data,
+                    selected_cols=selected_features,
+                    params=params_st,
+                    level="state",
+                    state=selected_state,
+                    test_periods=12
+                )
+        result_state = st.session_state[cache_key_st]
+
+        render_tuning_ui("state_sarimax", data, selected_features, "state", state=selected_state)
+        st.divider()
+        models_cols(result_state, selected_state.upper())
 
     with tab3:
-        with st.spinner("Loading model...", show_time=True):
-            result_us = sarimax_model_pipeline(
-                target_col="median_listing_price_x",
-                dataset=data,
-                selected_cols=selected_features,
-                params=get_sarimax_params("aggr_sarimax"),
-                level="us",
-                test_periods=12
-            )
-        models_cols(result_us, "Entire US", "aggr_sarimax")
+        params_us = get_sarimax_params("aggr_sarimax")
+        cache_key_us = f"cache_sarimax_us_{str(params_us)}"
+        if cache_key_us not in st.session_state:
+            with st.spinner("Loading model...", show_time=True):
+                st.session_state[cache_key_us] = sarimax_model_pipeline(
+                    target_col="median_listing_price_x",
+                    dataset=data,
+                    selected_cols=selected_features,
+                    params=params_us,
+                    level="us",
+                    test_periods=12
+                )
+        result_us = st.session_state[cache_key_us]
+
+        render_tuning_ui("aggr_sarimax", data, selected_features, "us")
+        st.divider()
+        models_cols(result_us, "Entire US")
+
+    st.divider()
+    st.header("📊 SARIMAX Tuning Results")
+    for m_var in model_vars:
+        res_key = f"{m_var}_tuning_results"
+        if res_key in st.session_state:
+            with st.expander(f"Tuning History: {m_var.replace('_', ' ').title()}", expanded=True):
+                st.dataframe(st.session_state[res_key], width='stretch')
+
+    return {
+        "region": result_region_dict,
+        "state": result_state["eval_results"],
+        "us": result_us["eval_results"]
+    }
         

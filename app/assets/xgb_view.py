@@ -165,7 +165,7 @@ def build_plot(result, plot_label):
         ))
 
     fig.update_layout(
-        title=f"Median Listing Price: Actual vs Predicted ({plot_label})",
+        title=f"Median Listing Price: Actual vs Predicted ({plot_label}) - XGBoost",
         xaxis_title="Date",
         yaxis_title="Price",
         hovermode="x unified",
@@ -284,6 +284,11 @@ def xgb_view(data, selected_regions, selected_state):
 
     st.header("XGBoost Regressor Model")
     
+    result_region_dict = {}
+    result_ust_dict = {}
+    result_state = {"eval_results": []}
+    result_us = {"eval_results": []}
+
     with st.expander("📘 Model Overview"):
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -426,8 +431,7 @@ def xgb_view(data, selected_regions, selected_state):
                 st.dataframe(st.session_state[res_key], width='stretch')
 
     return {
-        "region": result_region_dict,
-        "panel": result_ust_dict,
+        "region": {**result_region_dict, **{f"{k} (Panel)": v for k, v in result_ust_dict.items()}},
         "state": result_state["eval_results"],
         "us": result_us["eval_results"]
     }

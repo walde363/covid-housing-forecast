@@ -16,19 +16,50 @@ def get_ai_summary(data_table_md, level_name):
     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
     
     prompt = f"""
-    You are a Senior Real Estate Data Scientist. Analyze the following model performance table for housing price forecasts at the {level_name} level.
-    
-    Performance Data (Markdown):
-    {data_table_md}
-    
-    Your task:
-    1. Identify the 'Winner' model(s) based on RMSE and MASE.
-    2. Compare the advanced models (XGBoost, RF, Prophet, SARIMAX) against the 'Seasonal Naive' baseline. 
-    3. Note if any model has a MASE > 1 (meaning it is worse than the baseline).
-    4. Provide a brief (3-4 sentences) executive summary of which model is safest for investment decisions.
-    
-    Keep the tone professional, data-driven, and concise.
-    """
+        You are a Senior Real Estate Data Scientist presenting results to both technical stakeholders and decision-makers.
+
+        Analyze the following model performance table for housing price forecasts at the {level_name} level.
+
+        Performance Data (Markdown):
+        {data_table_md}
+
+        Your objectives:
+
+        1. Model Performance & Ranking
+        - Identify the best-performing model(s) based on RMSE and MASE.
+        - Explain any trade-offs between metrics (e.g., a model with low RMSE but weaker MASE).
+        - If performance is close across models, explicitly state that there is no clear winner.
+
+        2. Baseline Comparison (Critical)
+        - Compare each advanced model (XGBoost, Random Forest, Prophet, SARIMAX) against the Seasonal Naive baseline.
+        - Clearly explain whether each model provides meaningful improvement.
+        - Highlight any model with MASE > 1 and explain why it underperforms relative to a simple baseline.
+
+        3. Stability & Generalization Insight
+        - Assess which models appear most consistent and reliable.
+        - Comment on whether performance suggests overfitting or lack of generalization.
+        - If this is part of a multi-region/state/US analysis, comment on whether results are consistent across levels (if applicable).
+
+        4. Interpretability vs Performance Trade-off
+        - Briefly discuss which models are easier to interpret versus more complex.
+        - Explain whether increased complexity (e.g., XGBoost, RF) is justified by performance gains.
+
+        5. Real-World Decision Implications
+        - Translate results into practical insights for housing market forecasting.
+        - Explain what these results mean for someone making investment or policy decisions.
+        - Highlight risks of relying on weaker or unstable models.
+
+        6. Executive Summary (4–5 sentences)
+        - Recommend the safest model (or strategy) for real-world use.
+        - Justify based on accuracy, stability, and interpretability.
+        - If appropriate, suggest combining models or using a fallback (e.g., baseline).
+
+        Guidelines:
+        - Be concise, but insightful and analytical.
+        - Do NOT just restate the table — explain what it means.
+        - Use clear, professional language suitable for a capstone presentation.
+        - If results are ambiguous, say so and explain why.
+        """
     
     try:
         response = client.models.generate_content(

@@ -162,7 +162,7 @@ def build_plot(result, plot_label):
         ))
 
     fig.update_layout(
-        title=f"Median Listing Price: Actual vs Predicted ({plot_label})",
+        title=f"Median Listing Price: Actual vs Predicted ({plot_label}) - Random Forest",
         xaxis_title="Date",
         yaxis_title="Price",
         hovermode="x unified",
@@ -284,6 +284,11 @@ def rf_view(data, selected_regions, selected_state):
 
     st.header("Random Forest Regressor Model")
     
+    result_region_dict = {}
+    result_ust_dict = {}
+    result_state = {"eval_results": []}
+    result_us = {"eval_results": []}
+    
     with st.expander("📘 Model Overview"):
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -403,8 +408,9 @@ def rf_view(data, selected_regions, selected_state):
                         selected_region=region, test_periods=12, params=params_ust
                     )
             res_ust = st.session_state[cache_key_ust]
+            result_ust_dict[region] = res_ust["eval_results"]
             with st.expander(f"🌐 US Train → Region: {region}", expanded=True):
-                render_tuning_ui("ust_rf", data, "median_listing_price_x", "region", region=region)
+                render_tuning_ui("ust_rf", data, panel_features, "region", region=region)
                 st.divider()
                 models_cols(res_ust, f"US Train → {region}")
 
@@ -417,8 +423,7 @@ def rf_view(data, selected_regions, selected_state):
                 st.dataframe(st.session_state[res_key], width='stretch')
 
     return {
-        "region": result_region_dict,
-        "panel": result_ust_dict,
+        "region": {**result_region_dict, **{f"{k} (Panel)": v for k, v in result_ust_dict.items()}},
         "state": result_state["eval_results"],
         "us": result_us["eval_results"]
     }

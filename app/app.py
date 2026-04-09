@@ -156,6 +156,7 @@ month_options = sorted(
 if st.session_state.selected_month not in month_options:
     st.session_state.selected_month = month_options[0]
 
+
 # create filtered_data BEFORE summaries
 selected_state = st.session_state.selected_state
 filtered_data = data[data["state"] == selected_state].copy()
@@ -264,6 +265,7 @@ with col2:
 # render_choropleth(data, selected_state)
 
 regions = sorted(filtered_data["county_name_x"].dropna().unique().tolist())
+print(regions)
 
 if not regions:
     st.warning("No regions found for the selected state.")
@@ -300,7 +302,5 @@ with tab6:
         "SARIMAX": res_sarimax,
         "Prophet": res_prophet,
         "Random Forest": {"region": res_rf["region"], "state": res_rf["state"], "us": res_rf["us"]},
-        "Random Forest (Panel)": {"region": res_rf.get("panel", {})},
         "XGBoost": {"region": res_xgb["region"], "state": res_xgb["state"], "us": res_xgb["us"]},
-        "XGBoost (Panel)": {"region": res_xgb.get("panel", {})}
     })

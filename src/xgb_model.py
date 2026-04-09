@@ -31,7 +31,24 @@ def train_xgboost(X_train, y_train, X_test, params):
 
 
 def fit_xgboost_full(df_model, target_col, params):
-    X_full = df_model.drop(columns=[target_col, "date"], errors="ignore").copy()
+    df_model = add_time_features(df_model, target_col=target_col)
+
+    feature_cols = [
+        "year", "month", "quarter",
+        f"{target_col}_lag_1",
+        f"{target_col}_lag_2",
+        f"{target_col}_lag_3",
+        f"{target_col}_lag_6",
+        f"{target_col}_lag_12",
+        f"{target_col}_roll_mean_3",
+        f"{target_col}_roll_std_3",
+        f"{target_col}_roll_mean_6",
+        f"{target_col}_roll_std_6",
+    ]
+
+    df_model = df_model.dropna(subset=feature_cols + [target_col])
+
+    X_full = df_model[feature_cols].copy()
     y_full = df_model[target_col].copy()
 
     xgb_params = params.copy()
@@ -46,15 +63,9 @@ def recursive_xgb_forecast(
     model,
     df_model,
     target_col,
-    feature_cols,
-    feature_dtypes,
     steps=12
 ):
-    """
-    Recursively forecast future values using an XGBoost model
-    trained on tree-based time series features.
-    """
-    history = df_model.copy()
+    history = df_model[["date", target_col]].copy()
     history["date"] = pd.to_datetime(history["date"])
     history = history.sort_values("date").reset_index(drop=True)
 
@@ -64,20 +75,33 @@ def recursive_xgb_forecast(
         last_date = history["date"].max()
         next_date = last_date + pd.offsets.MonthBegin(1)
 
-        # Copy the last row to maintain dtypes and exogenous values, then update date
-        new_row = history.iloc[[-1]].copy()
-        new_row["date"] = next_date
-        new_row[target_col] = np.nan
+        new_row = pd.DataFrame({
+            "date": [next_date],
+            target_col: [np.nan]
+        })
 
         history = pd.concat([history, new_row], ignore_index=True)
 
         history = add_time_features(history, target_col=target_col)
 
-        next_row_features = history.iloc[[-1]][feature_cols].copy()
+        next_row = history.iloc[[-1]].copy()
 
-        next_row_features = next_row_features.astype(feature_dtypes)
+        feature_cols = [
+            "year", "month", "quarter",
+            f"{target_col}_lag_1",
+            f"{target_col}_lag_2",
+            f"{target_col}_lag_3",
+            f"{target_col}_lag_6",
+            f"{target_col}_lag_12",
+            f"{target_col}_roll_mean_3",
+            f"{target_col}_roll_std_3",
+            f"{target_col}_roll_mean_6",
+            f"{target_col}_roll_std_6",
+        ]
 
-        pred = model.predict(next_row_features)[0]
+        X_next = next_row[feature_cols]
+
+        pred = model.predict(X_next)[0]
 
         history.loc[history.index[-1], target_col] = pred
         future_predictions.append((next_date, pred))
@@ -97,8 +121,8 @@ def xgb_model_pipeline(
     level="region",
     region=None,
     state=None,
-    test_periods=12,
-    forecast_periods=12
+    test_periods=18,
+    forecast_periods=18
 ):
     """
     XGBoost pipeline supporting region/state/us modeling.
@@ -147,10 +171,7 @@ def xgb_model_pipeline(
         model=final_model,
         df_model=future_source,
         target_col=target_col,
-        feature_cols=X_full.columns.tolist(),
-        feature_dtypes=X_full.dtypes.to_dict(),
-        steps=forecast_periods
-    )
+        steps=forecast_periods)
 
     return {
         "model": model,

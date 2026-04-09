@@ -121,6 +121,11 @@ def rf_panel_pipeline(
 
     model, pred = train_random_forest(X_train, y_train, X_test, params)
 
+    # Retrain on full dataset (Train + Test) to capture the most recent trend for future forecasting
+    X_full = pd.concat([X_train, X_test])
+    y_full = pd.concat([y_train, y_test])
+    model.fit(X_full, y_full)
+
     evaluation_result = evaluate_model(
         y_true=y_test,
         y_pred=pred,

@@ -58,7 +58,7 @@ def build_snaive_plot(result, plot_label):
     ))
 
     fig.update_layout(
-        title=f"Actual vs Predicted ({plot_label})",
+        title=f"Actual vs Predicted ({plot_label}) - Seasonal Naive",
         xaxis_title="Date",
         yaxis_title="Price",
         template="plotly_dark",

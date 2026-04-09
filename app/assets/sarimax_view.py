@@ -151,7 +151,7 @@ def build_plot(result, plot_label):
         ))
 
     fig.update_layout(
-        title=f"Median Listing Price: Actual vs Predicted ({plot_label})",
+        title=f"Median Listing Price: Actual vs Predicted ({plot_label}) - SARIMAX",
         xaxis_title="Date",
         yaxis_title="Price",
         hovermode="x unified",

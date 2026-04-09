@@ -21,6 +21,20 @@ def _check_gpu_available():
             _GPU_AVAILABLE = False
     return _GPU_AVAILABLE
 
+def get_forecast_feature_cols(target_col):
+    return [
+        "year", "month", "quarter",
+        f"{target_col}_lag_1",
+        f"{target_col}_lag_2",
+        f"{target_col}_lag_3",
+        f"{target_col}_lag_6",
+        f"{target_col}_lag_12",
+        f"{target_col}_roll_mean_3",
+        f"{target_col}_roll_std_3",
+        f"{target_col}_roll_mean_6",
+        f"{target_col}_roll_std_6",
+    ]
+
 def train_xgboost(X_train, y_train, X_test, params):
     xgb_params = params.copy()
     xgb_params["device"] = "cuda" if _check_gpu_available() else "cpu"
@@ -42,11 +56,11 @@ def recursive_panel_xgb_forecast(
 ):
     """
     Recursively forecast future values for one selected region
-    using an XGBoost model trained on panel data.
+    using an XGBoost model trained on forecast-safe features.
     """
     region_key = selected_region.lower().strip()
 
-    history = df_model[df_model[region_col] == region_key].copy()
+    history = df_model[df_model[region_col] == region_key][["date", target_col]].copy()
     history["date"] = pd.to_datetime(history["date"])
     history = history.sort_values("date").reset_index(drop=True)
 
@@ -59,17 +73,15 @@ def recursive_panel_xgb_forecast(
         last_date = history["date"].max()
         next_date = last_date + pd.offsets.MonthBegin(1)
 
-        # Copy the last row to maintain dtypes and exogenous values, then update date
-        new_row = history.iloc[[-1]].copy()
-        new_row["date"] = next_date
-        new_row[target_col] = np.nan
+        new_row = pd.DataFrame({
+            "date": [next_date],
+            target_col: [np.nan]
+        })
 
         history = pd.concat([history, new_row], ignore_index=True)
-
         history = add_time_features(history, target_col=target_col)
 
         next_row_features = history.iloc[[-1]][feature_cols].copy()
-
         next_row_features = next_row_features.astype(feature_dtypes)
 
         pred = model.predict(next_row_features)[0]
@@ -137,21 +149,44 @@ def xgb_panel_pipeline(
     train_region = region_history[region_history["date"] < train_cutoff].copy()
     train = train_region.set_index("date")[target_col]
 
-    future_source = df_model[df_model["date"] <= test.index.max()].copy()
+    # Forecast-only model
+    future_source = df_model[df_model["date"] <= test_df["date"].max()].copy()
+
+    future_source_region = future_source[future_source[region_col] == region_key].copy()
+    future_source_region["date"] = pd.to_datetime(future_source_region["date"])
+    future_source_region = future_source_region.sort_values("date")
+
+    future_source_region = add_time_features(future_source_region, target_col=target_col)
+
+    forecast_feature_cols = get_forecast_feature_cols(target_col)
+
+    future_source_region = future_source_region.dropna(
+        subset=forecast_feature_cols + [target_col]
+    ).copy()
+
+    X_full = future_source_region[forecast_feature_cols].copy()
+    y_full = future_source_region[target_col].copy()
+
+    forecast_params = params.copy()
+    forecast_params["device"] = "cuda" if _check_gpu_available() else "cpu"
+
+    forecast_model = XGBRegressor(**forecast_params)
+    forecast_model.fit(X_full, y_full)
 
     future_forecast = recursive_panel_xgb_forecast(
-        model=model,
+        model=forecast_model,
         df_model=future_source,
         target_col=target_col,
         selected_region=selected_region,
-        feature_cols=X_train.columns.tolist(),
-        feature_dtypes=X_train.dtypes.to_dict(),
+        feature_cols=forecast_feature_cols,
+        feature_dtypes=X_full.dtypes.to_dict(),
         region_col=region_col,
         steps=18
     )
 
     return {
         "model": model,
+        "forecast_model": forecast_model,
         "forecast": forecast,
         "future_forecast": future_forecast,
         "train": train,

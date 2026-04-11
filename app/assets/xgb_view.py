@@ -185,12 +185,17 @@ def run_tuning(model_prefix, data, target_col, selected_features, level, region=
     progress_text = f"Tuning {model_prefix.replace('_', ' ')}..."
     my_bar = st.progress(0, text=progress_text)
     
+    # Added error handling and counter for failed combinations
+    failed_combinations = 0
+
     for i, combo in enumerate(combinations):
         my_bar.progress((i + 1) / len(combinations), text=f"{progress_text} ({i+1}/{len(combinations)})")
         params = dict(zip(param_names, combo))
         params.update({"random_state": 42, "n_jobs": -1})
         
         try:
+            # Ensure max_depth is None if it's supposed to be (though XGBoost usually expects int)
+            # This check is more relevant for RF, but good to keep consistent if max_depth could be None
             if model_prefix == "ust_xgb":
                 res = xgb_panel_pipeline(
                     target_col=target_col,
@@ -213,20 +218,44 @@ def run_tuning(model_prefix, data, target_col, selected_features, level, region=
                 )
             rmse = next(m["Value"] for m in res["eval_results"] if m["Metric"] == "RMSE")
             results_list.append({**params, "RMSE": rmse})
-        except Exception:
+        except Exception as e:
+            failed_combinations += 1
+            st.warning(f"Tuning failed for combination {combo} ({model_prefix}, {level}, {region or state}): {e}", icon="⚠️")
             continue
             
     if results_list:
         df = pd.DataFrame(results_list).sort_values("RMSE")
         res_key = f"{model_prefix}_{region}_tuning_results" if region else f"{model_prefix}_tuning_results"
         st.session_state[res_key] = df
+
+        # Update UI state with best parameters found
+        best_params = df.iloc[0]
+        suffix = f"_{region}" if region else ""
+        for param in param_names:
+            val = best_params[param]
+            if param in ["n_estimators", "max_depth"]:
+                val = int(val)
+            st.session_state[f"selected_{model_prefix}{suffix}_{param}"] = val
+            
         if rerun:
             st.rerun()
+    else:
+        st.error(f"No successful tuning results found for {model_prefix.replace('_', ' ')} ({level}, {region or state}). All combinations failed or were skipped.")
+    if failed_combinations > 0:
+        st.warning(f"Completed tuning with {failed_combinations} failed combinations for {model_prefix.replace('_', ' ')} ({level}, {region or state}).")
 
 
 def render_tuning_ui(model, data, selected_features, level, region=None, state=None):
     st.subheader(f"⚙️ Tuning: {region if region else level}")
     suffix = f"_{region}" if region else ""
+
+    # Handle tuning trigger before widgets are rendered
+    trigger_key = f"trigger_tune_{model}{suffix}"
+    if st.session_state.get(trigger_key, False):
+        run_tuning(model, data, "median_listing_price_x", selected_features, level, region, state, rerun=False)
+        st.session_state[trigger_key] = False
+        st.rerun()
+
     paramcol1, paramcol2 = st.columns(2)
     for param in xgb_tuning_features[:3]:
         paramcol1.selectbox(
@@ -242,7 +271,8 @@ def render_tuning_ui(model, data, selected_features, level, region=None, state=N
             )
     
     if st.button(f"🚀 Auto-Tune based on {region if region else level}", key=f"tune_btn_{model}_{region}", width='stretch'):
-        run_tuning(model, data, "median_listing_price_x", selected_features, level, region, state)
+        st.session_state[trigger_key] = True
+        st.rerun()
 
 def models_cols(results, plot_label):
     col1, col2 = st.columns([3, 1])

@@ -175,6 +175,8 @@ def run_tuning(model_prefix, data, target_col, selected_features, level, region=
     
     results_list = []
     
+    # Added error handling and counter for failed combinations
+    failed_combinations = 0
     progress_text = f"Tuning {model_prefix.replace('_', ' ')}..."
     my_bar = st.progress(0, text=progress_text)
     
@@ -210,12 +212,30 @@ def run_tuning(model_prefix, data, target_col, selected_features, level, region=
         df = pd.DataFrame(results_list).sort_values("RMSE")
         res_key = f"{model_prefix}_{region}_tuning_results" if region else f"{model_prefix}_tuning_results"
         st.session_state[res_key] = df
+
+        # Update UI state with best parameters found
+        best_params = df.iloc[0]
+        suffix = f"_{region}" if region else ""
+        for param in param_names:
+            st.session_state[f"selected_{model_prefix}{suffix}_{param}"] = int(best_params[param])
+
         if rerun:
             st.rerun()
+    else:
+        st.error(f"No successful tuning results found for {model_prefix.replace('_', ' ')} ({level}, {region or state}). All combinations failed or were skipped.")
+    if failed_combinations > 0:
+        st.warning(f"Completed tuning with {failed_combinations} failed combinations for {model_prefix.replace('_', ' ')} ({level}, {region or state}).")
 
 def render_tuning_ui(model, data, selected_features, level, region=None, state=None):
     st.subheader(f"⚙️ Tuning: {region if region else level}")
     suffix = f"_{region}" if region else ""
+
+    # Handle tuning trigger before widgets are rendered
+    trigger_key = f"trigger_tune_{model}{suffix}"
+    if st.session_state.get(trigger_key, False):
+        run_tuning(model, data, "median_listing_price_x", selected_features, level, region, state, rerun=False)
+        st.session_state[trigger_key] = False
+        st.rerun()
 
     row1_col1, row1_col2, row1_col3 = st.columns(3)
     with row1_col1:
@@ -258,7 +278,8 @@ def render_tuning_ui(model, data, selected_features, level, region=None, state=N
         )
     
     if st.button(f"🚀 Auto-Tune based on {region if region else level}", key=f"tune_btn_{model}{suffix}", width='stretch'):
-        run_tuning(model, data, "median_listing_price_x", selected_features, level, region, state)
+        st.session_state[trigger_key] = True
+        st.rerun()
 
 def models_cols(results, plot_label):
     col1, col2 = st.columns([3, 1])

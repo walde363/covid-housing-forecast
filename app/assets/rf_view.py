@@ -219,12 +219,31 @@ def run_tuning(model_prefix, data, target_col, selected_features, level, region=
         df = pd.DataFrame(results_list).sort_values("RMSE")
         res_key = f"{model_prefix}_{region}_tuning_results" if region else f"{model_prefix}_tuning_results"
         st.session_state[res_key] = df
+        
+        # Update UI state with best parameters found
+        best_params = df.iloc[0]
+        suffix = f"_{region}" if region else ""
+        for param in param_names:
+            val = best_params[param]
+            if param in ["n_estimators", "max_depth", "min_samples_split", "min_samples_leaf"]:
+                if not pd.isna(val):
+                    val = int(val)
+            st.session_state[f"selected_{model_prefix}{suffix}_{param}"] = None if pd.isna(val) else val
+            
         if rerun:
             st.rerun()
 
 def render_tuning_ui(model, data, selected_features, level, region=None, state=None):
     st.subheader(f"⚙️ Tuning: {region if region else level}")
     suffix = f"_{region}" if region else ""
+
+    # Handle tuning trigger before widgets are rendered
+    trigger_key = f"trigger_tune_{model}{suffix}"
+    if st.session_state.get(trigger_key, False):
+        run_tuning(model, data, "median_listing_price_x", selected_features, level, region, state, rerun=False)
+        st.session_state[trigger_key] = False
+        st.rerun()
+
     paramcol1, paramcol2 = st.columns(2)
     for param in rf_tuning_features[:3]:
         paramcol1.selectbox(
@@ -240,7 +259,8 @@ def render_tuning_ui(model, data, selected_features, level, region=None, state=N
             )
     
     if st.button(f"🚀 Auto-Tune based on {region if region else level}", key=f"tune_btn_{model}_{region}", width='stretch'):
-        run_tuning(model, data, "median_listing_price_x", selected_features, level, region, state)
+        st.session_state[trigger_key] = True
+        st.rerun()
 
 def models_cols(results, plot_label):
     col1, col2 = st.columns([3, 1])

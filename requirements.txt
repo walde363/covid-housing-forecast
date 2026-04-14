@@ -16,8 +16,6 @@ kagglehub
 thefuzz
 streamlit
 fpdf2
-cuml
-cupy
 google-genai
 kaleido
 coverage>=7.4
